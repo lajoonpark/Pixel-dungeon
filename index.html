@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Pixel Dungeon</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a0a1e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            cursor: crosshair;
+            image-rendering: pixelated;
+            max-width: 100vw;
+            max-height: 100vh;
+            aspect-ratio: 800 / 600;
+        }
+        #info {
+            color: #555;
+            font-size: 11px;
+            margin-top: 6px;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="info">WASD/Arrows · Q E R Abilities · Click to interact</div>
+
+    <!-- Load order: dependencies first, game loop last -->
+    <script src="js/saveSystem.js"></script>
+    <script src="js/assets.js"></script>
+    <script src="js/statusEffects.js"></script>
+    <script src="js/upgrades.js"></script>
+    <script src="js/projectiles.js"></script>
+    <script src="js/abilities.js"></script>
+    <script src="js/enemies.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/rooms.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
