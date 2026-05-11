@@ -1,12 +1,12 @@
 'use strict';
-// Abilities: Fireball (Q), Dash (E), Ice Nova (R)
+// Abilities: Fireball (J), Dash (K), Ice Nova (L)
 
 class FireballAbility {
     constructor(player) {
         this.player = player;
         this.baseCooldown = 4;
         this.cooldown = 0;
-        this.key = 'q';
+        this.key = 'j';
         this.name = 'Fireball';
         this.iconKey = 'icon_fireball';
     }
@@ -68,7 +68,7 @@ class DashAbility {
         this.player = player;
         this.baseCooldown = 5;
         this.cooldown = 0;
-        this.key = 'e';
+        this.key = 'k';
         this.name = 'Dash';
         this.iconKey = 'icon_dash';
         this.dashSpeed = 700;
@@ -150,7 +150,7 @@ class IceNovaAbility {
         this.player = player;
         this.baseCooldown = 10;
         this.cooldown = 0;
-        this.key = 'r';
+        this.key = 'l';
         this.name = 'Ice Nova';
         this.iconKey = 'icon_nova';
     }

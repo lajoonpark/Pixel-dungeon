@@ -98,9 +98,9 @@ const UI = {
 
     _renderAbilities(ctx, p, game) {
         const abilityDefs = [
-            { ab: p.abilities[0], key: 'Q', x: 660, y: 550 },
-            { ab: p.abilities[1], key: 'E', x: 700, y: 550 },
-            { ab: p.abilities[2], key: 'R', x: 740, y: 550 },
+            { ab: p.abilities[0], key: 'J', x: 660, y: 550 },
+            { ab: p.abilities[1], key: 'K', x: 700, y: 550 },
+            { ab: p.abilities[2], key: 'L', x: 740, y: 550 },
         ];
 
         for (const {ab, key, x, y} of abilityDefs) {
@@ -262,7 +262,7 @@ const UI = {
         ctx.fillStyle = '#555566';
         ctx.font = '11px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('WASD/Arrows: Move  •  Q: Fireball  •  E: Dash  •  R: Ice Nova  •  Esc: Pause', 400, 580);
+        ctx.fillText('WASD/Arrows: Move  •  J: Fireball  •  K: Dash  •  L: Ice Nova  •  Esc: Pause', 400, 580);
         ctx.textAlign = 'left';
     },
 
@@ -567,9 +567,9 @@ const UI = {
         const lines = [
             ['Controls', '#ffcc88'],
             ['WASD / Arrow Keys — Move', '#cccccc'],
-            ['Q — Fireball (auto-targets nearest enemy, AOE)', '#cccccc'],
-            ['E — Dash (invincible dash in move direction)', '#cccccc'],
-            ['R — Ice Nova (freeze all nearby enemies)', '#cccccc'],
+            ['J — Fireball (auto-targets nearest enemy, AOE)', '#cccccc'],
+            ['K — Dash (invincible dash in move direction)', '#cccccc'],
+            ['L — Ice Nova (freeze all nearby enemies)', '#cccccc'],
             ['Esc — Pause', '#cccccc'],
             ['', ''],
             ['Gameplay', '#ffcc88'],

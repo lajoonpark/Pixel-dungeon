@@ -52,6 +52,11 @@ const Game = {
     // Persistent save data
     saveData: null,
 
+    // Stability flags
+    _loopRunning: false,
+    _transitionInProgress: false,
+    _fatalError: null,
+
     init() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -61,12 +66,27 @@ const Game = {
         this._setupInput();
         this._setupMobileControls();
 
+        // Global error handlers for stability
+        window.onerror = (msg, src, line, col, err) => {
+            const text = `JS Error: ${msg} (${src}:${line})`;
+            console.error('[PixelDungeon]', text, err);
+            this._fatalError = text;
+        };
+        window.addEventListener('unhandledrejection', ev => {
+            const text = `Unhandled rejection: ${ev.reason}`;
+            console.error('[PixelDungeon]', text);
+            this._fatalError = text;
+        });
+
         // Show loading screen immediately
         this._renderLoadingFrame(0);
 
         Assets.load(() => {
             this.state = STATES.MENU;
-            requestAnimationFrame(t => this._loop(t));
+            if (!this._loopRunning) {
+                this._loopRunning = true;
+                requestAnimationFrame(t => this._loop(t));
+            }
         });
 
         // Poll loading progress
@@ -144,9 +164,9 @@ const Game = {
     _onKeyPress(code, e) {
         if (this.state === STATES.PLAYING) {
             if (code === 'Escape') { this.state = STATES.PAUSED; return; }
-            if (code === 'KeyQ') { this.player.abilities[0].use(this); }
-            if (code === 'KeyE') { this.player.abilities[1].use(this); }
-            if (code === 'KeyR') { this.player.abilities[2].use(this); }
+            if (code === 'KeyJ') { this.player.abilities[0].use(this); }
+            if (code === 'KeyK') { this.player.abilities[1].use(this); }
+            if (code === 'KeyL') { this.player.abilities[2].use(this); }
         } else if (this.state === STATES.PAUSED) {
             if (code === 'Escape') { this.state = STATES.PLAYING; }
         } else if (this.state === STATES.LEVELUP) {
@@ -277,6 +297,8 @@ const Game = {
         this.player.x = 80;
         this.player.y = 300;
         this.projectiles = [];
+        this.particles = [];
+        this._transitionInProgress = false;
 
         // Scale factor increases with room index
         this.scaleFactor = 1 + idx * 0.18;
@@ -290,16 +312,21 @@ const Game = {
             this.currentRoom.doorOpen = true;
             this.currentRoom.openDoor();
         } else {
-            this.enemies = this.currentRoom.spawnEnemies(idx, this.scaleFactor);
+            this.enemies = this.currentRoom.spawnEnemies(idx, this.scaleFactor, this.player.x, this.player.y);
         }
+
+        console.log(`[PixelDungeon] Room ${idx + 1} start — enemies: ${this.enemies.length}`);
     },
 
     _nextRoom() {
+        if (this._transitionInProgress) return;
+        this._transitionInProgress = true;
         const nextIdx = this.roomIndex + 1;
         if (nextIdx >= this.rooms.length) {
             this.victory();
             return;
         }
+        console.log(`[PixelDungeon] Room ${this.roomIndex + 1} cleared — transitioning to room ${nextIdx + 1}`);
         this._loadRoom(nextIdx);
     },
 
@@ -374,8 +401,15 @@ const Game = {
         const dt = Math.min((timestamp - this.lastTime) / 1000, 0.05);
         this.lastTime = timestamp;
 
-        this._update(dt);
-        this._render();
+        try {
+            this._update(dt);
+            this._render();
+        } catch (err) {
+            console.error('[PixelDungeon] Loop error:', err);
+            this._fatalError = String(err);
+            // Render error overlay so the player sees what happened
+            try { this._renderErrorOverlay(); } catch (_) {}
+        }
 
         requestAnimationFrame(t => this._loop(t));
     },
@@ -456,7 +490,7 @@ const Game = {
         // Decay screen shake
         if (this.screenShake > 0) this.screenShake = Math.max(0, this.screenShake - dt * 2.5);
 
-        // Cleanup dead
+        // Cleanup dead — filter after iterating to avoid mid-loop removal
         this.enemies    = this.enemies.filter(e => !e.dead || e.isBoss);
         this.projectiles = this.projectiles.filter(p => !p.dead);
         this.particles   = this.particles.filter(p => !p.dead);
@@ -464,6 +498,22 @@ const Game = {
 
         // Remove truly dead boss
         this.enemies = this.enemies.filter(e => !(e.isBoss && e.dead));
+
+        // Hard caps to prevent unbounded array growth
+        const MAX_ENEMIES = 40;
+        const MAX_PROJECTILES = 300;
+        const MAX_PARTICLES = 600;
+        if (this.enemies.length > MAX_ENEMIES) {
+            // Remove oldest non-boss non-elite dead-last enemies
+            const toRemove = this.enemies.length - MAX_ENEMIES;
+            let removed = 0;
+            this.enemies = this.enemies.filter(e => {
+                if (removed < toRemove && !e.isBoss && !e.isElite) { removed++; return false; }
+                return true;
+            });
+        }
+        if (this.projectiles.length > MAX_PROJECTILES) this.projectiles.splice(0, this.projectiles.length - MAX_PROJECTILES);
+        if (this.particles.length > MAX_PARTICLES)    this.particles.splice(0, this.particles.length - MAX_PARTICLES);
 
         // Check room cleared
         const aliveEnemies = this.enemies.filter(e => !e.dead);
@@ -562,6 +612,9 @@ const Game = {
         }
 
         if (this.screenShake > 0) ctx.restore();
+
+        // Error overlay (shown on top of everything)
+        if (this._fatalError) this._renderErrorOverlay();
     },
 
     _renderGame(ctx) {
@@ -588,6 +641,37 @@ const Game = {
 
         // Mobile controls
         if (this.isMobile) UI.renderMobileControls(ctx, this.joystick);
+    },
+
+    _renderErrorOverlay() {
+        const ctx = this.ctx;
+        if (!ctx || !this._fatalError) return;
+        ctx.fillStyle = 'rgba(0,0,0,0.82)';
+        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillStyle = '#ff4444';
+        ctx.font = 'bold 22px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠ Runtime Error', 400, 220);
+        ctx.fillStyle = '#cccccc';
+        ctx.font = '13px monospace';
+        // Word-wrap the error message
+        const words = this._fatalError.split(' ');
+        let line = '', ly = 265;
+        for (const w of words) {
+            if ((line + w).length > 60) {
+                ctx.fillText(line.trim(), 400, ly);
+                line = w + ' ';
+                ly += 18;
+            } else {
+                line += w + ' ';
+            }
+        }
+        if (line.trim()) ctx.fillText(line.trim(), 400, ly);
+        ctx.fillStyle = '#887799';
+        ctx.font = '13px monospace';
+        ctx.fillText('Check the browser console for details.', 400, ly + 30);
+        ctx.fillText('Refresh the page to restart.', 400, ly + 50);
+        ctx.textAlign = 'left';
     }
 };
 

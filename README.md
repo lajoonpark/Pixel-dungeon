@@ -14,7 +14,7 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 |---|---|
 | **3 Classes** | Knight · Mage · Rogue — each with unique stats and passives |
 | **Auto-attack** | Fires homing projectiles at the nearest enemy automatically |
-| **3 Abilities** | Fireball (Q) · Dash (E) · Ice Nova (R) |
+| **3 Abilities** | Fireball (J) · Dash (K) · Ice Nova (L) |
 | **7 Enemy Types + Boss** | Slime, Bat, Skeleton, Spider, Bomber, Healer, Summoner, Necromancer |
 | **10 Rooms** | 3 dungeon themes (Crypt → Forest → Lava), rest room at room 5, boss room at room 10 |
 | **Level-up System** | Choose 1 of 3 random run upgrades on level-up |
@@ -28,9 +28,9 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 | Input | Action |
 |---|---|
 | WASD / Arrow Keys | Move |
-| Q | Fireball ability |
-| E | Dash ability |
-| R | Ice Nova ability |
+| J | Fireball ability |
+| K | Dash ability |
+| L | Ice Nova ability |
 | Click | Interact with menus, chests, upgrades |
 | 1 / 2 / 3 | Select level-up card |
 | Esc | Pause / unpause |
