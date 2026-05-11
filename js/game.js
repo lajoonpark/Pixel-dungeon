@@ -504,16 +504,18 @@ const Game = {
         const MAX_PROJECTILES = 300;
         const MAX_PARTICLES = 600;
         if (this.enemies.length > MAX_ENEMIES) {
-            // Remove oldest non-boss non-elite dead-last enemies
+            // First pass: remove excess non-boss, non-elite enemies
             const toRemove = this.enemies.length - MAX_ENEMIES;
             let removed = 0;
             this.enemies = this.enemies.filter(e => {
                 if (removed < toRemove && !e.isBoss && !e.isElite) { removed++; return false; }
                 return true;
             });
+            // Fallback: if cap still exceeded (e.g. all are elite/boss), trim from the end
+            if (this.enemies.length > MAX_ENEMIES) this.enemies.length = MAX_ENEMIES;
         }
-        if (this.projectiles.length > MAX_PROJECTILES) this.projectiles.splice(0, this.projectiles.length - MAX_PROJECTILES);
-        if (this.particles.length > MAX_PARTICLES)    this.particles.splice(0, this.particles.length - MAX_PARTICLES);
+        if (this.projectiles.length > MAX_PROJECTILES) this.projectiles.length = MAX_PROJECTILES;
+        if (this.particles.length > MAX_PARTICLES)    this.particles.length = MAX_PARTICLES;
 
         // Check room cleared
         const aliveEnemies = this.enemies.filter(e => !e.dead);

@@ -14,6 +14,12 @@ const TILE_SIZE = 40;
 const GRID_W = 20;
 const GRID_H = 15;
 
+// Approximate collision radius per enemy type, used for safe-spawn checks
+const ENEMY_SPAWN_RADII = {
+    slime: 18, bat: 16, skeleton: 20, spider: 19,
+    bomber: 18, healer: 19, summoner: 21,
+};
+
 class Room {
     constructor(roomIndex, theme) {
         this.index = roomIndex;
@@ -154,8 +160,8 @@ class Room {
             }
         }
 
-        // Fallback: any valid tile center
-        return validTiles[Math.floor(Math.random() * validTiles.length)] || null;
+        // Fallback: return any valid tile center
+        return validTiles[Math.floor(Math.random() * validTiles.length)];
     }
 
     spawnEnemies(roomIndex, scaleFactor, playerX, playerY) {
@@ -166,9 +172,7 @@ class Room {
         for (let i = 0; i < count; i++) {
             const type = types[Math.floor(Math.random() * types.length)];
             const isElite = Math.random() < (0.05 + roomIndex * 0.03);
-            // Determine approximate enemy radius for safe spawn check
-            const radiusMap = { slime:18, bat:16, skeleton:20, spider:19, bomber:18, healer:19, summoner:21 };
-            const radius = radiusMap[type] || 20;
+            const radius = ENEMY_SPAWN_RADII[type] || 20;
             const pos = this.getSafeSpawnPosition(radius, playerX, playerY);
             if (!pos) continue; // skip rather than spawn in a wall
             const e = createEnemy(type, pos.x, pos.y, isElite);
