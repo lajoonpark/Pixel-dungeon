@@ -14,6 +14,12 @@ const TILE_SIZE = 40;
 const GRID_W = 20;
 const GRID_H = 15;
 
+// Approximate collision radius per enemy type, used for safe-spawn checks
+const ENEMY_SPAWN_RADII = {
+    slime: 18, bat: 16, skeleton: 20, spider: 19,
+    bomber: 18, healer: 19, summoner: 21,
+};
+
 class Room {
     constructor(roomIndex, theme) {
         this.index = roomIndex;
@@ -115,7 +121,50 @@ class Room {
         this.portal = { x: 790, y: 300, active: true };
     }
 
-    spawnEnemies(roomIndex, scaleFactor) {
+    // Returns a { x, y } world-position on a floor tile safe for spawning,
+    // or null if none could be found.
+    getSafeSpawnPosition(enemyRadius, playerX, playerY) {
+        const minPlayerDist = 150;
+        const r = Math.ceil(enemyRadius / TILE_SIZE);
+        const validTiles = [];
+
+        // Gather walkable floor tiles — right half of room, away from player start
+        for (let row = 1; row < GRID_H - 1; row++) {
+            for (let col = Math.floor(GRID_W / 2); col < GRID_W - 2; col++) {
+                if (this.tiles[row][col] !== TILE.FLOOR) continue;
+                const wx = (col + 0.5) * TILE_SIZE;
+                const wy = (row + 0.5) * TILE_SIZE;
+                // Minimum distance from player
+                if (playerX !== undefined && playerY !== undefined) {
+                    const ddx = wx - playerX, ddy = wy - playerY;
+                    if (ddx * ddx + ddy * ddy < minPlayerDist * minPlayerDist) continue;
+                }
+                validTiles.push({ x: wx, y: wy });
+            }
+        }
+
+        if (validTiles.length === 0) return null;
+
+        // Try random picks and verify radius clearance
+        for (let attempt = 0; attempt < 30; attempt++) {
+            const pos = validTiles[Math.floor(Math.random() * validTiles.length)];
+            // Check corners of bounding box aren't in walls
+            const checks = [
+                [pos.x - enemyRadius, pos.y],
+                [pos.x + enemyRadius, pos.y],
+                [pos.x, pos.y - enemyRadius],
+                [pos.x, pos.y + enemyRadius],
+            ];
+            if (checks.every(([cx, cy]) => !this.isWall(cx, cy))) {
+                return pos;
+            }
+        }
+
+        // Fallback: return any valid tile center
+        return validTiles[Math.floor(Math.random() * validTiles.length)];
+    }
+
+    spawnEnemies(roomIndex, scaleFactor, playerX, playerY) {
         const types = this._enemyTable(roomIndex);
         const enemies = [];
         const count = Math.min(3 + Math.floor(roomIndex * 0.8), 12);
@@ -123,9 +172,10 @@ class Room {
         for (let i = 0; i < count; i++) {
             const type = types[Math.floor(Math.random() * types.length)];
             const isElite = Math.random() < (0.05 + roomIndex * 0.03);
-            const x = 480 + Math.random() * 250;
-            const y = 80 + Math.random() * 440;
-            const e = createEnemy(type, x, y, isElite);
+            const radius = ENEMY_SPAWN_RADII[type] || 20;
+            const pos = this.getSafeSpawnPosition(radius, playerX, playerY);
+            if (!pos) continue; // skip rather than spawn in a wall
+            const e = createEnemy(type, pos.x, pos.y, isElite);
             // Scale HP and ATK with room index
             e.hp = Math.floor(e.hp * scaleFactor);
             e.maxHp = e.hp;
