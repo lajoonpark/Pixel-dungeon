@@ -1,0 +1,290 @@
+'use strict';
+
+class Player {
+    constructor(cls) {
+        // Class base stats
+        const CLASSES = {
+            knight: { maxHp:150, baseAtk:15, moveSpeed:200, range:120, spriteKey:'player_knight', name:'Knight' },
+            mage:   { maxHp:80,  baseAtk:25, moveSpeed:180, range:200, spriteKey:'player_mage',   name:'Mage',   isMage:true },
+            rogue:  { maxHp:100, baseAtk:12, moveSpeed:280, range:150, spriteKey:'player_rogue',  name:'Rogue',  isRogue:true },
+        };
+        const c = CLASSES[cls] || CLASSES.knight;
+        Object.assign(this, c);
+
+        this.cls = cls;
+        this.x = 100;
+        this.y = 300;
+        this.hp = this.maxHp;
+
+        // Multipliers (upgraded via upgrade cards)
+        this.atkMult = 1;
+        this.atkSpeedMult = this.isRogue ? 1.5 : 1;
+        this.moveSpeedMult = 1;
+        this.abilityCooldownMult = 1;
+
+        // Auto-attack state
+        this.atkCooldown = 0;
+        this.baseAtkSpeed = this.isRogue ? 0.6 : 1.0; // seconds between attacks
+        this.multiShot = 1;
+        this.critChance = 0;
+        this.lifeSteal = 0;
+        this.thorns = 0;
+        this.regen = 0;
+        this.regenTimer = 0;
+        this.onHitBurnChance = 0;
+        this.onHitPoisonChance = 0;
+
+        // Ability upgrades
+        this.fireballDmgMult = 1;
+        this.fireballAoeMult = 1;
+        this.fireballCDMult = 1;
+        this.novaDmgMult = 1;
+        this.novaRadiusMult = 1;
+
+        // Level & XP
+        this.level = 1;
+        this.xp = 0;
+        this.xpToNext = 100;
+
+        // Abilities
+        this.abilities = [
+            new FireballAbility(this),
+            new DashAbility(this),
+            new IceNovaAbility(this),
+        ];
+
+        // Visual
+        this.hitFlash = 0;
+        this.invincible = false;
+        this.invincibleTimer = 0;
+        this.frozen = false;
+        this.statusEffects = [];
+        this.kbVx = 0;
+        this.kbVy = 0;
+        this.facing = 1; // 1 = right, -1 = left
+        this.animTimer = 0;
+
+        // Mage bonus tracking
+        this.bonusCrystals = 0;
+    }
+
+    get atkInterval() {
+        return this.baseAtkSpeed / this.atkSpeedMult;
+    }
+
+    applyEffect(type) {
+        const existing = this.statusEffects.find(e => e.type === type);
+        if (existing) { existing.timer = 0; return; }
+        const eff = StatusEffects.create(type, 0);
+        if (eff) this.statusEffects.push(eff);
+    }
+
+    takeDamage(amount, game) {
+        if (this.invincible) return;
+        // Reduce if knight
+        if (this.cls === 'knight') amount *= 0.85;
+        this.hp = Math.max(0, this.hp - amount);
+        this.hitFlash = 0.25;
+        this.invincible = true;
+        this.invincibleTimer = 0.6;
+        if (game) game.addDamageNumber(this.x, this.y - 40, Math.ceil(amount), '#ff4444');
+        if (this.hp <= 0 && game) game.gameOver();
+    }
+
+    gainXp(amount, game) {
+        this.xp += amount;
+        while (this.xp >= this.xpToNext) {
+            this.xp -= this.xpToNext;
+            this.level++;
+            this.xpToNext = Math.floor(100 * Math.pow(this.level, 1.5));
+            if (game) game.triggerLevelUp();
+        }
+    }
+
+    update(dt, game) {
+        // Invincibility frames
+        if (this.invincible) {
+            this.invincibleTimer -= dt;
+            if (this.invincibleTimer <= 0) { this.invincible = false; }
+        }
+        if (this.hitFlash > 0) this.hitFlash -= dt;
+
+        // Knockback
+        if (Math.abs(this.kbVx) > 1 || Math.abs(this.kbVy) > 1) {
+            const nx = this.x + this.kbVx * dt;
+            const ny = this.y + this.kbVy * dt;
+            if (!game.currentRoom || !game.currentRoom.isWall(nx, this.y)) this.x = nx;
+            if (!game.currentRoom || !game.currentRoom.isWall(this.x, ny)) this.y = ny;
+            this.kbVx *= 0.8;
+            this.kbVy *= 0.8;
+        }
+
+        // Status effects
+        this.frozen = false;
+        this.statusEffects = this.statusEffects.filter(e => !StatusEffects.update(e, this, dt, null));
+
+        // HP regen
+        if (this.regen > 0) {
+            this.regenTimer += dt;
+            if (this.regenTimer >= 1) {
+                this.regenTimer -= 1;
+                const healed = Math.min(this.regen, this.maxHp - this.hp);
+                if (healed > 0) {
+                    this.hp += healed;
+                    game.addDamageNumber(this.x, this.y - 40, Math.ceil(healed), '#44ff88');
+                }
+            }
+        }
+
+        if (this.frozen) return;
+
+        // Movement
+        const keys = game.keys;
+        let dx = 0, dy = 0;
+        if (keys['KeyW'] || keys['ArrowUp'])    dy -= 1;
+        if (keys['KeyS'] || keys['ArrowDown'])  dy += 1;
+        if (keys['KeyA'] || keys['ArrowLeft'])  dx -= 1;
+        if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+
+        if (dx !== 0) this.facing = dx > 0 ? 1 : -1;
+
+        // Mobile joystick
+        if (game.joystick && game.joystick.active) {
+            dx += game.joystick.dx;
+            dy += game.joystick.dy;
+        }
+
+        const len = Math.sqrt(dx*dx+dy*dy);
+        if (len > 0) {
+            this.animTimer += dt;
+            const spd = this.moveSpeed * this.moveSpeedMult;
+            const nx = this.x + (dx/len) * spd * dt;
+            const ny = this.y + (dy/len) * spd * dt;
+            if (!game.currentRoom || !game.currentRoom.isWall(nx, this.y)) this.x = nx;
+            if (!game.currentRoom || !game.currentRoom.isWall(this.x, ny)) this.y = ny;
+        }
+
+        // Clamp to canvas
+        this.x = Math.max(30, Math.min(770, this.x));
+        this.y = Math.max(30, Math.min(570, this.y));
+
+        // Hazard tiles
+        if (game.currentRoom) {
+            const tileType = game.currentRoom.tileAt(this.x, this.y);
+            if (tileType === 2) { // spike
+                if (!this._spikeTimer) this._spikeTimer = 0;
+                this._spikeTimer += dt;
+                if (this._spikeTimer > 0.5) { this._spikeTimer = 0; this.takeDamage(8, game); }
+            } else if (tileType === 3) { // poison puddle
+                this.applyEffect('poison');
+            }
+        }
+
+        // Auto-attack
+        const dashAbility = this.abilities[1];
+        if (!dashAbility.dashing) {
+            this.atkCooldown -= dt;
+            if (this.atkCooldown <= 0) {
+                const targets = this._getAutoTargets(game);
+                if (targets.length > 0) {
+                    this.atkCooldown = this.atkInterval;
+                    for (const t of targets) this._shootAt(t, game);
+                }
+            }
+        }
+
+        // Ability updates
+        for (const ab of this.abilities) {
+            if (ab.update) ab.update(dt, game);
+        }
+    }
+
+    _getAutoTargets(game) {
+        const enemies = game.enemies.filter(e => !e.dead);
+        if (enemies.length === 0) return [];
+        // Sort by distance
+        const sorted = enemies.map(e => {
+            const dx = e.x - this.x, dy = e.y - this.y;
+            return { e, dist: Math.sqrt(dx*dx+dy*dy) };
+        }).sort((a, b) => a.dist - b.dist);
+
+        const inRange = sorted.filter(({dist}) => dist <= this.range);
+        if (inRange.length === 0) return [];
+        return inRange.slice(0, this.multiShot || 1).map(({e}) => e);
+    }
+
+    _shootAt(target, game) {
+        let dmg = this.baseAtk * this.atkMult;
+        let isCrit = false;
+        if (this.critChance > 0 && Math.random() < this.critChance) {
+            dmg *= 2;
+            isCrit = true;
+        }
+
+        const proj = new Projectile({
+            x: this.x, y: this.y,
+            tx: target.x, ty: target.y,
+            target, homing: true,
+            speed: 420, damage: dmg,
+            size: 10, type: 'arrow',
+            color: isCrit ? '#ffff44' : '#ffcc44',
+            glowColor: isCrit ? '#ffff00' : null,
+            owner: 'player',
+            maxLife: 2,
+            onHit: (enemy, gm) => {
+                if (this.lifeSteal > 0) {
+                    const healed = dmg * this.lifeSteal;
+                    this.hp = Math.min(this.maxHp, this.hp + healed);
+                }
+                if (this.onHitBurnChance > 0 && Math.random() < this.onHitBurnChance) {
+                    enemy.applyEffect('burn', this.baseAtk * this.atkMult);
+                }
+                if (this.onHitPoisonChance > 0 && Math.random() < this.onHitPoisonChance) {
+                    enemy.applyEffect('poison', 0);
+                }
+                if (isCrit) {
+                    gm.addDamageNumber(enemy.x, enemy.y - 30, Math.ceil(dmg), '#ffff44', true);
+                }
+                // Thorns knockback
+                if (this.thorns > 0) enemy.knockback(this.x, this.y, 120);
+            }
+        });
+        game.projectiles.push(proj);
+    }
+
+    render(ctx) {
+        ctx.save();
+
+        // Invincibility flicker
+        if (this.invincible && Math.floor(Date.now()/80) % 2 === 0) {
+            ctx.globalAlpha = 0.4;
+        }
+
+        if (this.hitFlash > 0) ctx.filter = `brightness(${2 + this.hitFlash*3})`;
+
+        const s = 48;
+        // Flip for facing direction
+        if (this.facing < 0) {
+            ctx.translate(this.x, this.y);
+            ctx.scale(-1, 1);
+            Assets.draw(ctx, this.spriteKey, -s/2, -s/2, s, s);
+        } else {
+            Assets.draw(ctx, this.spriteKey, this.x - s/2, this.y - s/2, s, s);
+        }
+
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        // Status rings
+        for (const eff of this.statusEffects) {
+            ctx.strokeStyle = StatusEffects.getColor(eff.type);
+            ctx.globalAlpha = 0.6;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 28, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+    }
+}
