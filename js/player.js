@@ -171,11 +171,11 @@ class Player {
         // Hazard tiles
         if (game.currentRoom) {
             const tileType = game.currentRoom.tileAt(this.x, this.y);
-            if (tileType === 2) { // spike
+            if (tileType === TILE.SPIKE) { // spike
                 if (!this._spikeTimer) this._spikeTimer = 0;
                 this._spikeTimer += dt;
                 if (this._spikeTimer > 0.5) { this._spikeTimer = 0; this.takeDamage(8, game); }
-            } else if (tileType === 3) { // poison puddle
+            } else if (tileType === TILE.POISON) { // poison puddle
                 this.applyEffect('poison');
             }
         }

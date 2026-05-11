@@ -524,7 +524,7 @@ const UI = {
                 ctx.fillStyle = canAfford ? '#ffffff' : '#885566';
                 ctx.font = 'bold 12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`Buy (${cost} 💎)`, x + 100, y + 119);
+                ctx.fillText(`Buy (${cost} crystals)`, x + 100, y + 119);
                 ctx.textAlign = 'left';
             } else {
                 ctx.fillStyle = '#448844';

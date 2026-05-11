@@ -11,9 +11,13 @@ from PIL import Image, ImageDraw, ImageFilter
 OUT = os.path.join(os.path.dirname(__file__), '..', 'public', 'generated-assets')
 os.makedirs(OUT, exist_ok=True)
 
+_saved_count = 0
+
 def save(img, name):
+    global _saved_count
     path = os.path.join(OUT, name)
     img.save(path)
+    _saved_count += 1
     print(f"  Generated: {name}")
 
 def scale(img, factor, size=None):
@@ -844,5 +848,4 @@ if __name__ == '__main__':
     gen_heal_effect()
     gen_ui_frame()
 
-    count = len(os.listdir(OUT))
-    print(f"\nDone! {count} assets saved to: {os.path.abspath(OUT)}")
+    print(f"\nDone! {_saved_count} assets saved to: {os.path.abspath(OUT)}")

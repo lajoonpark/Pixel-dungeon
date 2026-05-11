@@ -56,7 +56,7 @@ const Game = {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.saveData = SaveSystem.load();
-        this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth < 600;
+        this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
         this._setupInput();
         this._setupMobileControls();
