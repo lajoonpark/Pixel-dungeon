@@ -5,6 +5,7 @@ Generates all game sprites using Python Pillow.
 """
 
 import os
+import math
 from PIL import Image, ImageDraw, ImageFilter
 
 OUT = os.path.join(os.path.dirname(__file__), '..', 'public', 'generated-assets')
@@ -450,7 +451,6 @@ def gen_icon_nova():
     d.ellipse([8,8,16,16], fill=(120,200,255,255))
     d.ellipse([9,9,15,15], fill=(200,240,255,255))
     for angle_deg in range(0,360,45):
-        import math
         a = math.radians(angle_deg)
         x1 = int(12 + 5*math.cos(a)); y1 = int(12 + 5*math.sin(a))
         x2 = int(12 + 10*math.cos(a)); y2 = int(12 + 10*math.sin(a))
@@ -463,7 +463,6 @@ def gen_icon_coin():
     d.ellipse([3,3,21,21], fill=(200,160,20,255))
     d.ellipse([4,4,20,20], fill=(230,190,40,255))
     d.ellipse([6,6,18,18], fill=(245,210,60,255))
-    d.text = None
     d.ellipse([9,9,15,15], fill=(255,220,80,255))
     d.line([10,8,10,16], fill=(200,160,20,255), width=2)
     d.line([8,10,14,10], fill=(200,160,20,255), width=1)
@@ -492,7 +491,6 @@ def gen_icon_heart():
 def gen_icon_xp():
     img = new(24, 24)
     d = draw(img)
-    import math
     pts = []
     for i in range(5):
         a = math.radians(i*72 - 90)
@@ -517,7 +515,6 @@ def gen_effect_fireball():
 def gen_effect_explosion():
     img = new(16, 16)
     d = draw(img)
-    import math
     for r in [7,6,5]:
         for a in range(0,360,30):
             x = int(8 + r*math.cos(math.radians(a)))
@@ -615,7 +612,6 @@ def gen_portal():
     d.ellipse([6,6,10,10], fill=(200,140,255,255))
     d.ellipse([7,7,9,9], fill=(240,210,255,255))
     # swirl effect
-    import math
     for i in range(8):
         a = math.radians(i*45)
         r1, r2 = 3+i*0.3, 4+i*0.3

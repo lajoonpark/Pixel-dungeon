@@ -57,8 +57,9 @@ const StatusEffects = {
                 }
                 break;
             case 'shock':
-                if (effect.timer < 0.05 && allEnemies) {
-                    // Chain to nearby enemy
+                if (!effect.chained && allEnemies) {
+                    effect.chained = true;
+                    // Chain to nearest enemy once
                     for (const e of allEnemies) {
                         if (e === entity || e.dead) continue;
                         const dx = e.x - entity.x, dy = e.y - entity.y;
