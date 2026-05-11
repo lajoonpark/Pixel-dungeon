@@ -56,6 +56,19 @@ scripts/
 public/generated-assets/     ← 59 PNG pixel-art sprites (auto-generated)
 ```
 
+## Vercel Deployment
+
+When importing this project into Vercel, use these settings:
+
+| Setting | Value |
+|---|---|
+| **Framework Preset** | Other |
+| **Build Command** | *(leave empty)* |
+| **Output Directory** | `.` |
+| **Root Directory** | *(repo root)* |
+
+No build step is needed. Vercel serves the files as-is. The `vercel.json` at the repo root configures static file serving for all assets — do **not** add a catch-all rewrite rule, as that would cause JS files to be served as HTML.
+
 ## Regenerating Assets
 
 Requires Python 3 + Pillow:
