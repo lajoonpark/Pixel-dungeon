@@ -6,7 +6,13 @@ const SaveSystem = {
         permanentUpgrades: {},
         bestRun: { floor: 0, kills: 0, crystals: 0 },
         settings: { sfx: true, music: true },
-        totalRuns: 0
+        totalRuns: 0,
+        // Class system
+        unlockedClasses: ['human_adventurer'],
+        selectedClass: 'human_adventurer',
+        rollCount: 0,
+        rollCost: 20,
+        classShards: {},
     },
 
     load() {
@@ -30,3 +36,4 @@ const SaveSystem = {
 
     _deep(obj) { return JSON.parse(JSON.stringify(obj)); }
 };
+
