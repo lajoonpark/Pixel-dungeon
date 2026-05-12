@@ -664,7 +664,8 @@ const UI = {
         ctx.fillText(`Reached Floor ${game.roomIndex + 1}`, 400, 240);
         ctx.fillText(`Enemies Slain: ${game.killCount}`, 400, 268);
         ctx.fillText(`Coins Collected: ${game.coins}`, 400, 296);
-        ctx.fillText(`Crystals Earned: ${game.runCrystals || 0}`, 400, 324);
+        ctx.fillText(`Crystals Earned: ${game.runCrystalsEarned || 0}`, 400, 324);
+        ctx.fillText(`Total Crystals: ${game.crystals || 0}`, 400, 352);
 
         this._menuButton(ctx, 'RETRY', 400, 390, '#441122');
         this._menuButton(ctx, 'MAIN MENU', 400, 450, '#222233');
@@ -691,7 +692,8 @@ const UI = {
         ctx.fillText(`Floors cleared: ${game.rooms.length}`, 400, 256);
         ctx.fillText(`Enemies slain: ${game.killCount}`, 400, 284);
         ctx.fillStyle = '#ffcc44';
-        ctx.fillText(`+${game.runCrystals} Crystals earned!`, 400, 320);
+        ctx.fillText(`+${game.runCrystalsEarned || 0} Crystals earned!`, 400, 320);
+        ctx.fillText(`Total Crystals: ${game.crystals || 0}`, 400, 348);
 
         this._menuButton(ctx, 'SPEND CRYSTALS', 400, 390, '#442200');
         this._menuButton(ctx, 'MAIN MENU', 400, 450, '#222233');

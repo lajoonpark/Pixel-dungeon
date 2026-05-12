@@ -52,10 +52,13 @@ class BaseDashAbility {
         this.iconKey      = opts.iconKey  || 'icon_dash';
         this.isDash       = true;
 
-        this.dashSpeed    = opts.dashSpeed    || 700;
-        this.dashDuration = opts.dashDuration || 0.18;
+        this.baseDashSpeed    = opts.dashSpeed    || 700;
+        this.baseDashDuration = opts.dashDuration || 0.18;
+        this.dashSpeed    = this.baseDashSpeed;
+        this.dashDuration = this.baseDashDuration;
         this.grantInvincible = opts.grantInvincible !== false; // default true
         this.damagesEnemies  = opts.damagesEnemies  || false;
+        this.dashDamageMult  = opts.dashDamageMult || 1;
         this.trailColors     = opts.trailColors     || ['#4488ff', '#88ccff'];
 
         this.dashing   = false;
@@ -116,7 +119,7 @@ class BaseDashAbility {
                 if (dx * dx + dy * dy < (e.size + 16) * (e.size + 16)) {
                     if (!e._dashHit) {
                         e._dashHit = true;
-                        const dmg = p.baseAtk * p.atkMult * (p.abilityDmgMult || 1);
+                        const dmg = p.baseAtk * p.atkMult * (p.abilityDmgMult || 1) * (this.dashDamageMult || 1);
                         e.takeDamage(dmg, 'physical', game);
                     }
                 }
@@ -272,13 +275,14 @@ class QuickSlashAbility {
         this.key = SLOT_KEYS[slotIdx]; this.label = SLOT_LABELS[slotIdx];
         this.name = 'Quick Slash'; this.iconKey = 'icon_quick_slash';
     }
-    get maxCooldown() { return this.baseCooldown * (this.player.abilityCooldownMult || 1); }
+    get maxCooldown() { return this.baseCooldown * (this.player.abilityCooldownMult || 1) * (this.player.quickSlashCDMult || 1); }
     canUse() { return this.cooldown <= 0; }
     use(game) {
         if (!this.canUse()) return false;
         const p = this.player;
-        const dmg = p.baseAtk * p.atkMult * 1.8 * (p.abilityDmgMult || 1);
-        _meleeAoe(p, game, 100, dmg, 'physical', ['#ffcc88','#ffee99','#ffffff']);
+        const dmg = p.baseAtk * p.atkMult * 1.8 * (p.abilityDmgMult || 1) * (p.quickSlashDmgMult || 1);
+        const radius = 100 * (p.quickSlashRadiusMult || 1);
+        _meleeAoe(p, game, radius, dmg, 'physical', ['#ffcc88','#ffee99','#ffffff']);
         game.screenShake = Math.max(game.screenShake, 0.25);
         this.cooldown = this.maxCooldown; return true;
     }
@@ -290,6 +294,15 @@ class DashStrikeAbility extends BaseDashAbility {
         super(player, slotIdx, { baseCooldown: 5, name: 'Dash Strike', iconKey: 'icon_dash_strike',
             dashSpeed: 900, dashDuration: 0.14, damagesEnemies: true,
             trailColors: ['#ffaa44','#ff6622','#ffffff'] });
+    }
+    get maxCooldown() {
+        return this.baseCooldown * (this.player.abilityCooldownMult || 1) * (this.player.dashStrikeCDMult || 1);
+    }
+    use(game) {
+        this.dashSpeed = this.baseDashSpeed * (this.player.dashStrikeDistanceMult || 1);
+        this.dashDuration = this.baseDashDuration;
+        this.dashDamageMult = this.player.dashStrikeDmgMult || 1;
+        return super.use(game);
     }
 }
 
@@ -342,6 +355,10 @@ class FlameDashAbility extends BaseDashAbility {
             dashSpeed: 650, dashDuration: 0.22, trailColors: ['#ff8800','#ffcc00','#ff4400'] });
         this._fireTrailTimer = 0;
     }
+    use(game) {
+        this.dashDuration = this.baseDashDuration * (this.player.flameDashDurationMult || 1);
+        return super.use(game);
+    }
     onDashUpdate(dt, game) {
         this._fireTrailTimer += dt;
         if (this._fireTrailTimer > 0.06) {
@@ -374,12 +391,12 @@ class PiercingArrowAbility {
         const p = this.player;
         const target = game.nearestEnemy(p.x, p.y, 9999);
         if (!target) return false;
-        const dmg = p.baseAtk*p.atkMult*2.0*(p.abilityDmgMult||1);
+        const dmg = p.baseAtk*p.atkMult*2.0*(p.abilityDmgMult||1)*(p.piercingArrowDmgMult||1);
         const hitSet = new Set();
         game.projectiles.push(new Projectile({
             x: p.x, y: p.y, tx: target.x, ty: target.y,
             speed: 520, damage: dmg, size: 8, type: 'arrow', color: '#88ffcc',
-            owner: 'player', maxLife: 1.5, piercing: true,
+            owner: 'player', maxLife: 1.5, piercing: true, pierceCount: 1 + (p.piercingArrowExtraPierce || 0),
             onHit: (enemy, gm) => {
                 if (hitSet.has(enemy)) return; hitSet.add(enemy);
                 spawnExplosion(gm.particles, enemy.x, enemy.y, 4, ['#88ffcc','#ffffff'], 80, 4);
@@ -394,6 +411,9 @@ class RollDashAbility extends BaseDashAbility {
     constructor(player, slotIdx) {
         super(player, slotIdx, { baseCooldown: 3.5, name: 'Roll Dash', iconKey: 'icon_roll_dash',
             dashSpeed: 980, dashDuration: 0.12, trailColors: ['#88ffcc','#44ddaa','#ffffff'] });
+    }
+    get maxCooldown() {
+        return this.baseCooldown * (this.player.abilityCooldownMult || 1) * (this.player.rollDashCDMult || 1);
     }
 }
 

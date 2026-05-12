@@ -17,6 +17,9 @@ class Projectile {
         this.dead = false;
         this.owner = cfg.owner || 'player'; // 'player' or 'enemy'
         this.glowColor = cfg.glowColor || null;
+        this.piercing = !!cfg.piercing;
+        this.pierceRemaining = Math.max(0, Math.floor(cfg.pierceCount || 0));
+        this.hitTargets = new Set();
         this.angle = Math.atan2(cfg.ty - cfg.y, cfg.tx - cfg.x);
         this._vx = Math.cos(this.angle) * this.speed;
         this._vy = Math.sin(this.angle) * this.speed;
