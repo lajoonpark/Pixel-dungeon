@@ -300,7 +300,7 @@ class DashStrikeAbility extends BaseDashAbility {
     }
     use(game) {
         this.dashSpeed = this.baseDashSpeed * (this.player.dashStrikeDistanceMult || 1);
-        this.dashDuration = this.baseDashDuration * (this.player.dashStrikeDistanceMult || 1);
+        this.dashDuration = this.baseDashDuration;
         this.dashDamageMult = this.player.dashStrikeDmgMult || 1;
         return super.use(game);
     }

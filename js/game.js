@@ -437,8 +437,7 @@ const Game = {
 
     triggerLevelUp() {
         const prevState = this.state;
-        this.upgradeChoices = UpgradeSystem.roll(this.player, 3)
-            .filter(upg => UpgradeSystem.isUpgradeAllowed(this.player, upg));
+        this.upgradeChoices = UpgradeSystem.roll(this.player, 3);
         this.state = STATES.LEVELUP;
         this.hoverCard = -1;
         UI._hoveredCard = -1;
@@ -556,7 +555,7 @@ const Game = {
     _finalizeRunCrystalAccounting(outcome) {
         const actualDelta = (this.crystals || 0) - (this.startingCrystals || 0);
         if (actualDelta !== (this.runCrystalsEarned || 0)) {
-            console.warn('[PixelDungeon] Crystal mismatch detected', {
+            console.warn('[PixelDungeon] Crystal accounting mismatch detected: run-earned crystals do not match actual crystal delta', {
                 outcome,
                 startingCrystals: this.startingCrystals || 0,
                 currentCrystals: this.crystals || 0,
@@ -605,7 +604,7 @@ const Game = {
     gameOver() {
         // Update best run
         if (this.roomIndex + 1 > this.saveData.bestRun.floor) {
-            this.saveData.bestRun = { floor: this.roomIndex+1, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
+            this.saveData.bestRun = { floor: this.roomIndex + 1, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
         }
         SaveSystem.save(this.saveData);
         this._finalizeRunCrystalAccounting('game_over');

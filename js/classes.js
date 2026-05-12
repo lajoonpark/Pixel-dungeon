@@ -46,14 +46,14 @@ const CLASS_DEFS = {
                 id: 'quick_slash',
                 name: 'Quick Slash',
                 type: 'active',
-                tags: ['melee', 'damage', 'movement'],
+                tags: ['melee', 'damage', 'mobility'],
                 upgradePool: ['quickSlashDamage', 'quickSlashRadius', 'quickSlashCooldown']
             },
             {
                 id: 'dash_strike',
                 name: 'Dash Strike',
                 type: 'active',
-                tags: ['dash', 'movement', 'damage'],
+                tags: ['dash', 'mobility', 'damage'],
                 upgradePool: ['dashStrikeDistance', 'dashStrikeDamage', 'dashStrikeCooldown']
             }
         ],
@@ -87,7 +87,7 @@ const CLASS_DEFS = {
                 id: 'flame_dash',
                 name: 'Flame Dash',
                 type: 'active',
-                tags: ['dash', 'movement', 'fire'],
+                tags: ['dash', 'mobility', 'fire'],
                 upgradePool: ['flameDashTrailDuration']
             }
         ],
@@ -121,7 +121,7 @@ const CLASS_DEFS = {
                 id: 'roll_dash',
                 name: 'Roll Dash',
                 type: 'active',
-                tags: ['dash', 'movement'],
+                tags: ['dash', 'mobility'],
                 upgradePool: ['rollDashCooldown']
             }
         ],

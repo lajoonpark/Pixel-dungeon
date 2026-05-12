@@ -35,7 +35,7 @@ const UPGRADES = [
     { id:'rollDashCooldown', name:'Roll Dash Cooldown -30%', desc:'Roll Dash recharges faster.', rarity:'common', tags:['ability','dash','mobility'], icon:'icon_roll_dash', type:'ability', requiredAbilityId:'roll_dash', apply(p){ p.rollDashCDMult = (p.rollDashCDMult||1)*0.7; } },
 
     // Tag synergy (only appears if class/ability tags satisfy requirements)
-    { id:'dashMomentum', name:'Dash Momentum', desc:'Gain move speed and faster ability cooldowns.', rarity:'rare', tags:['mobility','dash','synergy'], icon:'upgrade_dash', type:'synergy', requiredTags:['dash','movement'], apply(p){ p.moveSpeedMult *= 1.08; p.abilityCooldownMult *= 0.92; } },
+    { id:'dashMomentum', name:'Dash Momentum', desc:'Gain move speed and faster ability cooldowns.', rarity:'rare', tags:['mobility','dash','synergy'], icon:'upgrade_dash', type:'synergy', requiredTags:['dash','mobility'], apply(p){ p.moveSpeedMult *= 1.08; p.abilityCooldownMult *= 0.92; } },
 
     // Survival
     { id:'maxhp',        name:'+25 Max HP',            desc:'Increase your maximum health.',             rarity:'common',  tags:['survival'], icon:'upgrade_maxhp', type:'generic', apply(p){ p.maxHp += 25; p.hp = Math.min(p.hp+25, p.maxHp); } },
@@ -58,12 +58,12 @@ const UpgradeSystem = {
     _classContext(player) {
         const classDef = player && player.classDef ? player.classDef : null;
         const classId = classDef ? classDef.id : null;
-        const classAbilityIds = new Set(Array.isArray(classDef && classDef.abilityIds) ? classDef.abilityIds : []);
-        const classTags = new Set(Array.isArray(classDef && classDef.tags) ? classDef.tags : []);
+        const playerAbilityIds = new Set(Array.isArray(classDef.abilityIds) ? classDef.abilityIds : []);
+        const classTags = new Set(Array.isArray(classDef.tags) ? classDef.tags : []);
 
-        const abilityDefs = Array.isArray(classDef && classDef.abilities)
+        const abilityDefs = Array.isArray(classDef.abilities)
             ? classDef.abilities
-            : Array.from(classAbilityIds).map(id => ({ id, tags: [], upgradePool: [] }));
+            : Array.from(playerAbilityIds).map(id => ({ id, tags: [], upgradePool: [] }));
 
         const allowedAbilityUpgradeIds = new Set();
         const abilityTags = new Set();
@@ -75,13 +75,13 @@ const UpgradeSystem = {
 
         if (allowedAbilityUpgradeIds.size === 0) {
             for (const u of UPGRADES) {
-                if (u.type === 'ability' && u.requiredAbilityId && classAbilityIds.has(u.requiredAbilityId)) {
+                if (u.type === 'ability' && u.requiredAbilityId && playerAbilityIds.has(u.requiredAbilityId)) {
                     allowedAbilityUpgradeIds.add(u.id);
                 }
             }
         }
 
-        return { classId, classAbilityIds, classTags, abilityTags, allowedAbilityUpgradeIds };
+        return { classId, classAbilityIds: playerAbilityIds, classTags, abilityTags, allowedAbilityUpgradeIds };
     },
 
     isUpgradeAllowed(player, upgrade) {
