@@ -513,6 +513,7 @@ const Game = {
 
         let amount = 1;
         const crystalFinderLevel = (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_crystal) || 0;
+        // Keep this capped for forward compatibility if Crystal Finder max rank increases later.
         const bonusChance = Math.min(1, crystalFinderLevel * CRYSTAL_FINDER_BONUS_CHANCE_PER_LEVEL);
 
         if (Math.random() < bonusChance) {
