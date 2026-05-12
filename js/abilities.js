@@ -45,7 +45,7 @@ class FireballAbility {
                     if (dx*dx + dy*dy < aoe*aoe) {
                         const dist = Math.sqrt(dx*dx+dy*dy);
                         const falloff = 1 - dist / aoe;
-                        e.takeDamage(dmg * falloff, 'fire');
+                        e.takeDamage(dmg * falloff, 'fire', gm);
                         e.applyEffect('burn', p.baseAtk * p.atkMult);
                     }
                 }
@@ -171,7 +171,7 @@ class IceNovaAbility {
             if (e.dead) continue;
             const dx = e.x - p.x, dy = e.y - p.y;
             if (dx*dx + dy*dy < radius*radius) {
-                e.takeDamage(dmg, 'ice');
+                e.takeDamage(dmg, 'ice', game);
                 e.applyEffect('freeze', dmg);
             }
         }

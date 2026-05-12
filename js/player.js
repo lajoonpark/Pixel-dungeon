@@ -79,16 +79,23 @@ class Player {
         if (eff) this.statusEffects.push(eff);
     }
 
-    takeDamage(amount, game) {
+    takeDamage(amount, sourceOrGame, maybeGame) {
         if (this.invincible) return;
+        const game = (maybeGame && typeof maybeGame === 'object')
+            ? maybeGame
+            : ((sourceOrGame && typeof sourceOrGame === 'object') ? sourceOrGame : null);
+
+        amount = Number.isFinite(amount) ? amount : 0;
         // Reduce if knight
         if (this.cls === 'knight') amount *= 0.85;
         this.hp = Math.max(0, this.hp - amount);
         this.hitFlash = 0.25;
         this.invincible = true;
         this.invincibleTimer = 0.6;
-        if (game) game.addDamageNumber(this.x, this.y - 40, Math.ceil(amount), '#ff4444');
-        if (this.hp <= 0 && game) game.gameOver();
+        if (game && typeof game.addDamageNumber === 'function') {
+            game.addDamageNumber(this.x, this.y - 40, Math.ceil(amount), '#ff4444', { role: 'player' });
+        }
+        if (this.hp <= 0 && game && typeof game.gameOver === 'function') game.gameOver();
     }
 
     gainXp(amount, game) {
@@ -121,7 +128,7 @@ class Player {
 
         // Status effects
         this.frozen = false;
-        this.statusEffects = this.statusEffects.filter(e => !StatusEffects.update(e, this, dt, null));
+        this.statusEffects = this.statusEffects.filter(e => !StatusEffects.update(e, this, dt, null, game));
 
         // HP regen
         if (this.regen > 0) {
@@ -131,7 +138,9 @@ class Player {
                 const healed = Math.min(this.regen, this.maxHp - this.hp);
                 if (healed > 0) {
                     this.hp += healed;
-                    game.addDamageNumber(this.x, this.y - 40, Math.ceil(healed), '#44ff88');
+                    if (game && typeof game.addDamageNumber === 'function') {
+                        game.addDamageNumber(this.x, this.y - 40, Math.ceil(healed), '#44ff88', { role: 'player' });
+                    }
                 }
             }
         }
@@ -243,7 +252,9 @@ class Player {
                     enemy.applyEffect('poison', 0);
                 }
                 if (isCrit) {
-                    gm.addDamageNumber(enemy.x, enemy.y - 30, Math.ceil(dmg), '#ffff44', true);
+                    if (gm && typeof gm.addDamageNumber === 'function') {
+                        gm.addDamageNumber(enemy.x, enemy.y - 30, Math.ceil(dmg), '#ffff44', { big: true, role: 'enemy' });
+                    }
                 }
                 // Thorns knockback
                 if (this.thorns > 0) enemy.knockback(this.x, this.y, 120);

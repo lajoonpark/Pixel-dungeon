@@ -366,15 +366,27 @@ const Game = {
         return best;
     },
 
-    addDamageNumber(x, y, amount, color, big) {
+    addDamageNumber(x, y, amount, color, options) {
+        if (!Array.isArray(this.damageNumbers)) this.damageNumbers = [];
+
+        const opts = (typeof options === 'boolean')
+            ? { big: options }
+            : ((options && typeof options === 'object') ? options : {});
+
+        const safeX = Number.isFinite(x) ? x : 0;
+        const safeY = Number.isFinite(y) ? y : 0;
+        const safeAmount = Number.isFinite(amount) ? amount : 0;
+        const role = opts.role === 'player' ? 'player' : (opts.role === 'enemy' ? 'enemy' : null);
+        const fallbackColor = role === 'player' ? '#ff4444' : '#ffcc44';
+
         this.damageNumbers.push({
-            x: x + (Math.random()-0.5)*20,
-            y,
-            text: Math.ceil(amount).toString(),
-            color: color || '#ffcc44',
+            x: safeX + (Math.random()-0.5)*20,
+            y: safeY,
+            text: (opts.text != null ? String(opts.text) : Math.ceil(safeAmount).toString()),
+            color: color || opts.color || fallbackColor,
             life: 0,
-            maxLife: 1.1,
-            big: !!big
+            maxLife: Number.isFinite(opts.maxLife) ? Math.max(0.1, opts.maxLife) : 1.1,
+            big: !!opts.big
         });
     },
 
@@ -439,8 +451,7 @@ const Game = {
                     if (e.dead) continue;
                     if (pr.distanceTo(e.x, e.y) < e.size + pr.size * 0.5) {
                         const dmg = pr.damage;
-                        e.takeDamage(dmg, 'physical');
-                        this.addDamageNumber(e.x, e.y - 30, dmg, '#ffee44');
+                        e.takeDamage(dmg, 'physical', this);
                         if (pr.onHit) pr.onHit(e, this);
                         // Knockback
                         e.knockback(pr.x - pr._vx*dt*2, pr.y - pr._vy*dt*2, 80);
@@ -482,6 +493,7 @@ const Game = {
 
         // Particles & damage numbers
         for (const pt of this.particles) pt.update(dt);
+        if (!Array.isArray(this.damageNumbers)) this.damageNumbers = [];
         for (const dn of this.damageNumbers) {
             dn.life += dt;
             dn.y -= 40 * dt;
