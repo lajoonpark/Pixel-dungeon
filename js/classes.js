@@ -19,6 +19,7 @@ const RARITY_COLORS = {
 };
 
 const RARITY_WEIGHTS = { common: 60, rare: 25, epic: 10, legendary: 4, mythic: 1 };
+const _TOTAL_RARITY_WEIGHT = Object.values(RARITY_WEIGHTS).reduce((a, b) => a + b, 0);
 
 // ── Class definitions ─────────────────────────────────────────────────────────
 // Each class:  id, name, rarity, stats, passiveDesc, description, abilityIds,
@@ -259,8 +260,7 @@ const ClassSystem = {
 
     /** Roll a random class based on rarity weights */
     rollRandom() {
-        const total = Object.values(RARITY_WEIGHTS).reduce((a, b) => a + b, 0);
-        let r = Math.random() * total;
+        let r = Math.random() * _TOTAL_RARITY_WEIGHT;
         let rarity = 'common';
         for (const [rar, w] of Object.entries(RARITY_WEIGHTS)) {
             r -= w;

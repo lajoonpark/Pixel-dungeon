@@ -251,7 +251,7 @@ class Player {
             if (this.chronoRepeatTimer >= this.chronoRepeatInterval) {
                 this.chronoRepeatTimer = 0;
                 // Auto-use first available non-dash ability
-                const ab = this.abilities.find(a => !a.isDash && a.canUse && a.canUse());
+                const ab = this.abilities.find(a => !a.isDash && typeof a.canUse === 'function' && a.canUse());
                 if (ab) ab.use(game);
             }
         }

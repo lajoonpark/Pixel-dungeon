@@ -271,12 +271,10 @@ const Game = {
                 }
             });
         } else if (this.state === STATES.CLASS_COLLECTION) {
-            if (my >= 555 || (mx >= 20 && mx <= 160 && my >= 555)) { this.state = STATES.CLASS_SELECT; return; }
-            if (mx >= 20 && mx <= 160 && my >= 555) { this.state = STATES.CLASS_SELECT; return; }
-            // Back
-            if (mx >= 340 && mx <= 460 && my >= 555) { this.state = STATES.CLASS_SELECT; return; }
+            // Back button (bottom centre or bottom bar)
+            if (my >= 555) { this.state = STATES.CLASS_SELECT; return; }
         } else if (this.state === STATES.CLASS_ROLL) {
-            if (my >= 555 || (mx >= 20 && mx <= 160 && my >= 555)) { this.state = STATES.CLASS_SELECT; return; }
+            if (my >= 555) { this.state = STATES.CLASS_SELECT; return; }
             // Roll button
             if (mx >= 300 && mx <= 500 && my >= 430 && my <= 470) {
                 this._doRoll();
