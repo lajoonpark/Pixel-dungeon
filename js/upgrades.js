@@ -37,7 +37,7 @@ const PERMANENT_UPGRADES = [
     { id:'p_atk',    name:'Combat Training',  desc:'+10% Damage per rank.',    maxRank:5, costPerRank:[1,1,2,2,3], icon:'upgrade_damage',    apply(p,rank){ p.atkMult *= Math.pow(1.10, rank); } },
     { id:'p_speed',  name:'Fleet Footed',     desc:'+8% Move Speed per rank.', maxRank:5, costPerRank:[1,1,2,2,3], icon:'upgrade_speed',     apply(p,rank){ p.moveSpeedMult *= Math.pow(1.08, rank); } },
     { id:'p_cd',     name:'Quick Recovery',   desc:'-10% Ability CD per rank.',maxRank:5, costPerRank:[1,2,2,3,3], icon:'upgrade_dash',      apply(p,rank){ p.abilityCooldownMult *= Math.pow(0.90, rank); } },
-    { id:'p_crystal',name:'Crystal Finder',   desc:'+1 Crystal/room per rank.',maxRank:3, costPerRank:[1,2,3],      icon:'icon_crystal',      apply(p,rank){ p.bonusCrystals = (p.bonusCrystals||0)+rank; } },
+    { id:'p_crystal',name:'Crystal Finder',   desc:'+10% chance/rank for +1 bonus room crystal.',maxRank:3, costPerRank:[1,2,3],      icon:'icon_crystal',      apply(){} },
 ];
 
 const UpgradeSystem = {

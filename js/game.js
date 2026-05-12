@@ -68,6 +68,7 @@ const Game = {
     _loopRunning: false,
     _transitionInProgress: false,
     _fatalError: null,
+    claimedRoomCrystalRewards: new Set(),
 
     init() {
         this.canvas = document.getElementById('gameCanvas');
@@ -371,6 +372,7 @@ const Game = {
         this.particles = [];
         this.damageNumbers = [];
         this.allies = [];
+        this.claimedRoomCrystalRewards = new Set();
 
         // Apply permanent upgrades
         UpgradeSystem.applyPermanent(this.player, this.saveData);
@@ -416,6 +418,7 @@ const Game = {
     _nextRoom() {
         if (this._transitionInProgress) return;
         this._transitionInProgress = true;
+        this.awardRoomClearCrystals(this.roomIndex);
         const nextIdx = this.roomIndex + 1;
         if (nextIdx >= this.rooms.length) {
             this.victory();
@@ -503,6 +506,37 @@ const Game = {
         });
     },
 
+    awardRoomClearCrystals(roomIndex) {
+        if (!Number.isInteger(roomIndex)) return;
+        if (this.claimedRoomCrystalRewards.has(roomIndex)) return;
+
+        let amount = 1;
+        const crystalFinderLevel = (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_crystal) || 0;
+        const bonusChance = Math.min(1, crystalFinderLevel * 0.10);
+
+        if (Math.random() < bonusChance) {
+            amount += 1;
+            if (this.player) {
+                this.addDamageNumber(this.player.x, this.player.y - 30, 0, '#a855f7', { text: 'Crystal Finder +1' });
+            }
+        }
+
+        this.saveData.crystals = (this.saveData.crystals || 0) + amount;
+        SaveSystem.save(this.saveData);
+
+        if (this.player) {
+            this.addDamageNumber(
+                this.player.x,
+                this.player.y - 50,
+                0,
+                '#c084fc',
+                { text: `+${amount} crystal${amount > 1 ? 's' : ''}` }
+            );
+        }
+
+        this.claimedRoomCrystalRewards.add(roomIndex);
+    },
+
     gameOver() {
         // Update best run
         if (this.roomIndex + 1 > this.saveData.bestRun.floor) {
@@ -514,7 +548,7 @@ const Game = {
     },
 
     victory() {
-        const bonusCrystals = 5 + Math.floor(this.killCount / 10) + (this.player.bonusCrystals || 0);
+        const bonusCrystals = 5 + Math.floor(this.killCount / 10);
         this.runCrystals += bonusCrystals;
         this.saveData.crystals += this.runCrystals;
         this.saveData.bestRun = { floor: this.rooms.length, kills: this.killCount, crystals: this.runCrystals };

@@ -62,6 +62,12 @@ Only **Human Adventurer** is unlocked at the start. All others must be obtained 
 - Duplicate classes convert to **bonus crystals** (scaled by rarity: Common=2, Rare=4, Epic=8, Legendary=12, Mythic=20)
 - All unlocked classes visible in the **Collection** screen
 
+## Crystal Rewards
+
+- Clearing any room grants **+1 crystal** immediately.
+- **Crystal Finder** grants **+10% chance per level** to gain **+1 bonus crystal** on room clear (capped at 100%).
+- Room-clear crystals are saved to localStorage immediately.
+
 ## Controls
 
 | Input | Action |
@@ -146,4 +152,4 @@ LOADING -> MENU -> CLASS_SELECT -> CLASS_COLLECTION
 
 Rooms 0-3 and 5-8 are combat rooms (scales +18% per room). Room 4 and 8 are rest/treasure rooms. Room 9 is the Necromancer boss fight.
 
-Killing the boss triggers a Victory screen; crystals earned during the run are added to your permanent stash for the shop and the roll system.
+Killing the boss still grants separate victory rewards; room-clear crystals are awarded and saved immediately during the run.
