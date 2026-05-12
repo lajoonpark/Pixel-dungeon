@@ -17,6 +17,8 @@ const STATES = {
 };
 
 const TOTAL_ROOMS = 10;
+const DEFAULT_ABILITY_COUNT = 2;
+const ABILITY_HINT_KEYS = ['J', 'K', 'L', 'U', 'I'];
 
 const Game = {
     state: STATES.LOADING,
@@ -453,7 +455,7 @@ const Game = {
         if (!infoEl) return;
 
         const activeClassId = classId || (this.saveData && this.saveData.selectedClass) || 'human_adventurer';
-        let abilityCount = 2;
+        let abilityCount = DEFAULT_ABILITY_COUNT;
         if (typeof ClassSystem !== 'undefined') {
             const classDef = ClassSystem.get(activeClassId) || ClassSystem.get('human_adventurer');
             if (classDef && Array.isArray(classDef.abilityIds)) {
@@ -461,7 +463,7 @@ const Game = {
             }
         }
         abilityCount = Math.max(0, Math.min(5, abilityCount));
-        const keyLabels = ['J', 'K', 'L', 'U', 'I'].slice(0, abilityCount).join(' ');
+        const keyLabels = ABILITY_HINT_KEYS.slice(0, abilityCount).join(' ');
         infoEl.textContent = `WASD/Arrows · ${keyLabels} Abilities · Click to interact`;
     },
 
