@@ -19,6 +19,7 @@ const STATES = {
 const TOTAL_ROOMS = 10;
 const DEFAULT_ABILITY_KEY_COUNT = 2;
 const ABILITY_HINT_KEYS = ['J', 'K', 'L', 'U', 'I'];
+const CRYSTAL_FINDER_BONUS_CHANCE_PER_LEVEL = 0.10;
 
 const Game = {
     state: STATES.LOADING,
@@ -512,7 +513,7 @@ const Game = {
 
         let amount = 1;
         const crystalFinderLevel = (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_crystal) || 0;
-        const bonusChance = Math.min(1, crystalFinderLevel * 0.10);
+        const bonusChance = Math.min(1, crystalFinderLevel * CRYSTAL_FINDER_BONUS_CHANCE_PER_LEVEL);
 
         if (Math.random() < bonusChance) {
             amount += 1;
