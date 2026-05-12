@@ -2,6 +2,10 @@
 """
 Pixel Dungeon Asset Generator
 Generates all game sprites using Python Pillow.
+
+Class/ability/passive icons for 12 classes are generated in gen_class_assets().
+To regenerate: pip install Pillow && python scripts/generate-assets.py
+Assets are saved to: public/generated-assets/
 """
 
 import os
@@ -32,7 +36,167 @@ def new(w, h):
 def draw(img):
     return ImageDraw.Draw(img)
 
-# ── Player sprites (16×16 → 64×64) ─────────────────────────────────────────
+# ── Rarity palette ────────────────────────────────────────────────────────────
+
+RARITY_RGB = {
+    'common':    (136, 136, 136),
+    'rare':      (68,  136, 255),
+    'epic':      (170,  68, 204),
+    'legendary': (255, 170,   0),
+    'mythic':    (204,  34,  34),
+}
+
+# ── Shared class-asset helpers ────────────────────────────────────────────────
+
+def _player_sprite_16(body, head, accent):
+    """Generate a 16×16 pixel player sprite scaled to 64×64."""
+    img = new(16, 16)
+    d = draw(img)
+    d.rectangle([5, 12, 7, 15], fill=body)
+    d.rectangle([9, 12, 11, 15], fill=body)
+    d.rectangle([4, 7, 12, 12], fill=body)
+    d.ellipse([5, 2, 11, 8], fill=head)
+    d.rectangle([6, 4,  7,  5], fill=(30, 30, 30, 255))
+    d.rectangle([9, 4, 10,  5], fill=(30, 30, 30, 255))
+    d.rectangle([5, 8, 11,  9], fill=accent)
+    return img.resize((64, 64), Image.NEAREST)
+
+def _portrait_64(body, head, accent, rarity='common'):
+    """Generate a 64×64 portrait with a rarity-coloured border."""
+    img = new(64, 64)
+    d = draw(img)
+    rc = RARITY_RGB[rarity]
+    d.rectangle([0, 0, 63, 63], fill=(20, 12, 32, 255))
+    d.rectangle([0, 0, 63, 63], outline=rc, width=2)
+    d.ellipse([16, 4, 47, 32], fill=head + (255,))
+    d.rectangle([12, 30, 51, 55], fill=body + (255,))
+    d.rectangle([12, 38, 51, 40], fill=accent + (255,))
+    d.rectangle([23, 12, 26, 16], fill=(30, 30, 30, 255))
+    d.rectangle([37, 12, 40, 16], fill=(30, 30, 30, 255))
+    d.rectangle([14, 55, 26, 63], fill=body + (255,))
+    d.rectangle([37, 55, 49, 63], fill=body + (255,))
+    return img
+
+def _passive_icon(rarity):
+    """Generate a 48×48 passive icon with a rarity diamond."""
+    rc = RARITY_RGB[rarity]
+    img = new(24, 24)
+    d = draw(img)
+    d.rectangle([0, 0, 23, 23], fill=(15, 10, 25, 255))
+    d.polygon([(12, 1), (22, 12), (12, 22), (1, 12)], fill=rc + (180,), outline=rc + (255,))
+    d.rectangle([9, 8, 15, 16], fill=(255, 255, 200, 255))
+    return img.resize((48, 48), Image.NEAREST)
+
+def _rarity_frame(rarity):
+    """Generate a 64×64 rarity frame/border PNG."""
+    rc = RARITY_RGB[rarity]
+    img = new(64, 64)
+    d = draw(img)
+    d.rectangle([0, 0, 63, 63], outline=rc + (255,), width=3)
+    d.rectangle([4, 4, 59, 59], outline=rc + (120,), width=1)
+    for cx, cy in [(0, 0), (60, 0), (0, 60), (60, 60)]:
+        d.ellipse([cx, cy, cx + 3, cy + 3], fill=rc + (255,))
+    return img
+
+# ── Class sprite tables ───────────────────────────────────────────────────────
+
+_CLASS_SPRITES = {
+    'player_adventurer':   ((80,120,200), (220,180,140), (160,200,255)),
+    'player_fire_mage':    ((180,60,20),  (220,180,140), (255,140,20)),
+    'player_ranger':       ((60,120,60),  (200,170,130), (80,200,100)),
+    'player_frost_knight': ((80,140,200), (200,220,255), (120,180,255)),
+    'player_venom_rogue':  ((40,140,60),  (180,155,120), (100,255,80)),
+    'player_stormcaller':  ((80,80,40),   (220,210,160), (255,240,60)),
+    'player_necromancer':  ((60,40,80),   (180,160,140), (140,80,200)),
+    'player_gunslinger':   ((120,90,40),  (200,170,120), (220,180,60)),
+    'player_paladin':      ((200,180,80), (230,200,160), (255,240,140)),
+    'player_dragon_knight':((160,50,10),  (210,170,130), (255,100,20)),
+    'player_void_assassin':((60,20,100),  (160,140,120), (140,40,220)),
+    'player_chronomancer': ((40,80,160),  (190,200,230), (80,180,255)),
+}
+
+_CLASS_RARITY = {
+    'player_adventurer':   'common',
+    'player_fire_mage':    'common',
+    'player_ranger':       'common',
+    'player_frost_knight': 'rare',
+    'player_venom_rogue':  'rare',
+    'player_stormcaller':  'rare',
+    'player_necromancer':  'epic',
+    'player_gunslinger':   'epic',
+    'player_paladin':      'epic',
+    'player_dragon_knight':'legendary',
+    'player_void_assassin':'legendary',
+    'player_chronomancer': 'mythic',
+}
+
+_ABILITY_ICONS = {
+    'icon_quick_slash':     (255,200,100), 'icon_dash_strike':     (255,160,60),
+    'icon_fireball_shot':   (255,120,20),  'icon_flame_dash':      (255,90,20),
+    'icon_piercing_arrow':  (80,255,180),  'icon_roll_dash':       (40,200,140),
+    'icon_ice_slam':        (120,200,255), 'icon_shield_dash':     (160,220,255),
+    'icon_frost_armor':     (180,230,255), 'icon_toxic_daggers':   (100,255,60),
+    'icon_shadow_dash':     (120,40,180),  'icon_poison_cloud':    (60,200,20),
+    'icon_chain_bolt':      (255,255,60),  'icon_blink_dash':      (255,255,150),
+    'icon_thunder_ring':    (255,220,0),   'icon_bone_spear':      (200,210,180),
+    'icon_wraith_dash':     (140,60,200),  'icon_raise_skeleton':  (190,205,175),
+    'icon_soul_burst':      (155,60,255),  'icon_revolver_shot':   (255,210,80),
+    'icon_combat_roll':     (210,165,50),  'icon_ricochet_bullet': (255,200,60),
+    'icon_bullet_storm':    (255,210,70),  'icon_holy_strike':     (255,235,150),
+    'icon_divine_dash':     (255,245,190), 'icon_heal_wave':       (60,255,130),
+    'icon_judgment_beam':   (255,230,120), 'icon_flame_claw':      (255,90,20),
+    'icon_inferno_dash':    (255,130,20),  'icon_dragon_breath':   (200,60,10),
+    'icon_lava_eruption':   (255,60,10),   'icon_meteor_crash':    (255,30,10),
+    'icon_void_slash':      (120,30,255),  'icon_rift_dash':       (90,20,180),
+    'icon_shadow_blades':   (70,10,155),   'icon_phase_shift':     (60,0,200),
+    'icon_void_collapse':   (45,0,155),    'icon_time_bolt':       (60,150,255),
+    'icon_warp_dash':       (120,200,255), 'icon_rewind':          (60,200,255),
+    'icon_time_stop':       (160,230,255), 'icon_collapse':        (30,130,255),
+}
+
+_PASSIVE_ICONS = {
+    'passive_adventurer':   'common',   'passive_fire_mage':    'common',
+    'passive_ranger':       'common',   'passive_frost_knight': 'rare',
+    'passive_venom_rogue':  'rare',     'passive_stormcaller':  'rare',
+    'passive_necromancer':  'epic',     'passive_gunslinger':   'epic',
+    'passive_paladin':      'epic',     'passive_dragon_knight':'legendary',
+    'passive_void_assassin':'legendary','passive_chronomancer': 'mythic',
+}
+
+def gen_class_assets():
+    """Generate all 12-class player sprites, portraits, ability icons, passive icons, rarity frames."""
+    print("\n[Class player sprites]")
+    for key, (body, head, accent) in _CLASS_SPRITES.items():
+        img = _player_sprite_16(body + (255,), head + (255,), accent + (180,))
+        save(img, key + '.png')
+
+    print("\n[Class portraits]")
+    for key, (body, head, accent) in _CLASS_SPRITES.items():
+        portrait_key = key.replace('player_', 'portrait_')
+        rarity = _CLASS_RARITY.get(key, 'common')
+        img = _portrait_64(body, head, accent, rarity)
+        save(img, portrait_key + '.png')
+
+    print("\n[Ability icons]")
+    for key, rgb in _ABILITY_ICONS.items():
+        img = new(24, 24)
+        d = draw(img)
+        d.rectangle([0, 0, 23, 23], fill=(20, 15, 35, 255))
+        d.ellipse([2, 2, 21, 21], fill=rgb + (200,))
+        ir = tuple(min(255, c + 60) for c in rgb)
+        d.ellipse([7, 7, 16, 16], fill=ir + (240,))
+        img = img.resize((48, 48), Image.NEAREST)
+        save(img, key + '.png')
+
+    print("\n[Passive icons]")
+    for key, rarity in _PASSIVE_ICONS.items():
+        img = _passive_icon(rarity)
+        save(img, key + '.png')
+
+    print("\n[Rarity frames]")
+    for rarity in ('common', 'rare', 'epic', 'legendary', 'mythic'):
+        save(_rarity_frame(rarity), f'frame_{rarity}.png')
+
 
 def gen_player_knight():
     img = new(16, 16)
@@ -847,5 +1011,8 @@ if __name__ == '__main__':
     gen_particle_spark()
     gen_heal_effect()
     gen_ui_frame()
+
+    print("\n[Class system assets]")
+    gen_class_assets()
 
     print(f"\nDone! {_saved_count} assets saved to: {os.path.abspath(OUT)}")

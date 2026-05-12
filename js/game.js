@@ -1,16 +1,18 @@
 'use strict';
 
 const STATES = {
-    LOADING:      'loading',
-    MENU:         'menu',
-    CLASS_SELECT: 'class_select',
-    PLAYING:      'playing',
-    PAUSED:       'paused',
-    LEVELUP:      'levelup',
-    GAMEOVER:     'gameover',
-    VICTORY:      'victory',
-    SHOP:         'shop',
-    HELP:         'help',
+    LOADING:           'loading',
+    MENU:              'menu',
+    CLASS_SELECT:      'class_select',
+    CLASS_COLLECTION:  'class_collection',
+    CLASS_ROLL:        'class_roll',
+    PLAYING:           'playing',
+    PAUSED:            'paused',
+    LEVELUP:           'levelup',
+    GAMEOVER:          'gameover',
+    VICTORY:           'victory',
+    SHOP:              'shop',
+    HELP:              'help',
 };
 
 const TOTAL_ROOMS = 10;
@@ -27,6 +29,7 @@ const Game = {
     // Run state
     player: null,
     enemies: [],
+    allies: [],
     projectiles: [],
     particles: [],
     damageNumbers: [],
@@ -38,6 +41,12 @@ const Game = {
     runCrystals: 0,
     upgradeChoices: [],
     scaleFactor: 1,
+
+    // Roll animation state
+    rollAnimTimer: 0,
+    rollAnimActive: false,
+    rollAnimResult: null,
+    rollAnimPhase: 'idle', // 'idle', 'spinning', 'reveal'
 
     // Hover state for UI clicks
     hoverBtn: null,
@@ -164,15 +173,21 @@ const Game = {
     _onKeyPress(code, e) {
         if (this.state === STATES.PLAYING) {
             if (code === 'Escape') { this.state = STATES.PAUSED; return; }
-            if (code === 'KeyJ') { this.player.abilities[0].use(this); }
-            if (code === 'KeyK') { this.player.abilities[1].use(this); }
-            if (code === 'KeyL') { this.player.abilities[2].use(this); }
+            if (this.player && this.player.abilities) {
+                if (code === 'KeyJ' && this.player.abilities[0]) this.player.abilities[0].use(this);
+                if (code === 'KeyK' && this.player.abilities[1]) this.player.abilities[1].use(this);
+                if (code === 'KeyL' && this.player.abilities[2]) this.player.abilities[2].use(this);
+                if (code === 'KeyU' && this.player.abilities[3]) this.player.abilities[3].use(this);
+                if (code === 'KeyI' && this.player.abilities[4]) this.player.abilities[4].use(this);
+            }
         } else if (this.state === STATES.PAUSED) {
             if (code === 'Escape') { this.state = STATES.PLAYING; }
         } else if (this.state === STATES.LEVELUP) {
             if (code === 'Digit1') this._selectUpgrade(0);
             if (code === 'Digit2') this._selectUpgrade(1);
             if (code === 'Digit3') this._selectUpgrade(2);
+        } else if (this.state === STATES.CLASS_COLLECTION || this.state === STATES.CLASS_ROLL) {
+            if (code === 'Escape') { this.state = STATES.CLASS_SELECT; }
         }
     },
 
@@ -187,11 +202,18 @@ const Game = {
                 if (mx >= 260 && mx <= 540 && my >= b.y && my <= b.y + 44) { this.hoverBtn = b.id; break; }
             }
         } else if (this.state === STATES.CLASS_SELECT) {
-            const classes = [{ id:'knight', x:160 }, { id:'mage', x:400 }, { id:'rogue', x:640 }];
+            // Hover on unlocked class cards
             this.hoverClass = null;
-            for (const c of classes) {
-                if (mx >= c.x - 95 && mx <= c.x + 95 && my >= 110 && my <= 470) { this.hoverClass = c.id; break; }
-            }
+            const unlocked = this.saveData.unlockedClasses || ['human_adventurer'];
+            const perRow = Math.min(unlocked.length, 4);
+            const cardW = 160, cardH = 200, gapX = 20;
+            const totalW = perRow * cardW + (perRow-1)*gapX;
+            const startX = (800 - totalW) / 2;
+            unlocked.forEach((id, i) => {
+                const col = i % perRow, row = Math.floor(i / perRow);
+                const cx = startX + col*(cardW+gapX), cy = 100 + row*220;
+                if (mx >= cx && mx <= cx+cardW && my >= cy && my <= cy+cardH) this.hoverClass = id;
+            });
         } else if (this.state === STATES.LEVELUP) {
             const choices = this.upgradeChoices;
             const cardW = 180;
@@ -227,12 +249,37 @@ const Game = {
                 }
             }
         } else if (this.state === STATES.CLASS_SELECT) {
-            if (my >= 560) { this.state = STATES.MENU; return; }
-            const classes = [{ id:'knight', x:160 }, { id:'mage', x:400 }, { id:'rogue', x:640 }];
-            for (const c of classes) {
-                if (mx >= c.x-95 && mx <= c.x+95 && my >= 110 && my <= 470) {
-                    this._startRun(c.id); return;
+            // Back button
+            if (my >= 555 && mx >= 20 && mx <= 160) { this.state = STATES.MENU; return; }
+            // Roll button
+            if (mx >= 600 && mx <= 780 && my >= 530 && my <= 565) { this.state = STATES.CLASS_ROLL; return; }
+            // Collection button
+            if (mx >= 600 && mx <= 780 && my >= 490 && my <= 525) { this.state = STATES.CLASS_COLLECTION; return; }
+            // Click a class card to play
+            const unlocked = this.saveData.unlockedClasses || ['human_adventurer'];
+            const perRow = Math.min(unlocked.length, 4);
+            const cardW = 160, cardH = 200, gapX = 20;
+            const totalW = perRow * cardW + (perRow-1)*gapX;
+            const startX = (800 - totalW) / 2;
+            unlocked.forEach((id, i) => {
+                const col = i % perRow, row = Math.floor(i / perRow);
+                const cx = startX + col*(cardW+gapX), cy = 100 + row*220;
+                if (mx >= cx && mx <= cx+cardW && my >= cy && my <= cy+cardH) {
+                    this.saveData.selectedClass = id;
+                    SaveSystem.save(this.saveData);
+                    this._startRun(id);
                 }
+            });
+        } else if (this.state === STATES.CLASS_COLLECTION) {
+            if (my >= 555 || (mx >= 20 && mx <= 160 && my >= 555)) { this.state = STATES.CLASS_SELECT; return; }
+            if (mx >= 20 && mx <= 160 && my >= 555) { this.state = STATES.CLASS_SELECT; return; }
+            // Back
+            if (mx >= 340 && mx <= 460 && my >= 555) { this.state = STATES.CLASS_SELECT; return; }
+        } else if (this.state === STATES.CLASS_ROLL) {
+            if (my >= 555 || (mx >= 20 && mx <= 160 && my >= 555)) { this.state = STATES.CLASS_SELECT; return; }
+            // Roll button
+            if (mx >= 300 && mx <= 500 && my >= 430 && my <= 470) {
+                this._doRoll();
             }
         } else if (this.state === STATES.LEVELUP) {
             const choices = this.upgradeChoices;
@@ -259,13 +306,44 @@ const Game = {
                 }
             });
         } else if (this.state === STATES.PAUSED) {
-            // Resume button
             if (my >= 410 && my <= 450 && mx >= 290 && mx <= 510) { this.state = STATES.PLAYING; }
-            // Quit
             if (my >= 465 && my <= 505 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
         } else if (this.state === STATES.HELP) {
             if (my >= 540 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
         }
+    },
+
+    _doRoll() {
+        if (this.rollAnimActive) return;
+        const cost = this.saveData.rollCost || 20;
+        if (this.saveData.crystals < cost) return; // can't afford
+
+        this.saveData.crystals -= cost;
+        this.saveData.rollCount = (this.saveData.rollCount || 0) + 1;
+        // Scale cost: +10 per roll, cap at 100
+        this.saveData.rollCost = Math.min(100, cost + 10);
+
+        const result = (typeof ClassSystem !== 'undefined') ? ClassSystem.roll() : { id: 'human_adventurer' };
+        const unlocked = this.saveData.unlockedClasses || ['human_adventurer'];
+        const isDuplicate = unlocked.includes(result.id);
+
+        if (!isDuplicate) {
+            this.saveData.unlockedClasses = [...unlocked, result.id];
+        } else {
+            // Duplicate: award crystals
+            this.saveData.classShards = this.saveData.classShards || {};
+            this.saveData.classShards[result.id] = (this.saveData.classShards[result.id] || 0) + 1;
+            const shardsBonus = { common:2, rare:4, epic:8, legendary:12, mythic:20 }[result.rarity] || 2;
+            this.saveData.crystals += shardsBonus;
+        }
+
+        SaveSystem.save(this.saveData);
+
+        // Trigger roll animation
+        this.rollAnimActive = true;
+        this.rollAnimTimer = 0;
+        this.rollAnimResult = { ...result, isDuplicate };
+        this.rollAnimPhase = 'spinning';
     },
 
     _startRun(playerClass) {
@@ -276,6 +354,7 @@ const Game = {
         this.projectiles = [];
         this.particles = [];
         this.damageNumbers = [];
+        this.allies = [];
 
         // Apply permanent upgrades
         UpgradeSystem.applyPermanent(this.player, this.saveData);
@@ -428,6 +507,18 @@ const Game = {
     },
 
     _update(dt) {
+        // Update roll animation regardless of state
+        if (this.rollAnimActive) {
+            this.rollAnimTimer += dt;
+            if (this.rollAnimPhase === 'spinning' && this.rollAnimTimer >= 1.5) {
+                this.rollAnimPhase = 'reveal';
+            }
+            if (this.rollAnimPhase === 'reveal' && this.rollAnimTimer >= 3.5) {
+                this.rollAnimActive = false;
+                this.rollAnimPhase = 'idle';
+            }
+        }
+
         if (this.state !== STATES.PLAYING) return;
 
         const p = this.player;
@@ -440,6 +531,13 @@ const Game = {
         for (const e of this.enemies) {
             if (!e.dead) e.update(dt, p, this);
         }
+
+        // Allies (minions)
+        if (!this.allies) this.allies = [];
+        for (const a of this.allies) {
+            if (!a.dead) a.update(dt, this);
+        }
+        this.allies = this.allies.filter(a => !a.dead);
 
         // Projectiles
         for (const pr of this.projectiles) {
@@ -602,7 +700,13 @@ const Game = {
                 UI.renderMenu(ctx, this.saveData, this.hoverBtn);
                 break;
             case STATES.CLASS_SELECT:
-                UI.renderClassSelect(ctx, this.hoverClass);
+                UI.renderClassSelect(ctx, this.saveData, this.hoverClass);
+                break;
+            case STATES.CLASS_COLLECTION:
+                UI.renderClassCollection(ctx, this.saveData);
+                break;
+            case STATES.CLASS_ROLL:
+                UI.renderClassRoll(ctx, this.saveData, this.rollAnimActive, this.rollAnimPhase, this.rollAnimResult, this.rollAnimTimer);
                 break;
             case STATES.HELP:
                 UI.renderHelp(ctx);
@@ -641,6 +745,9 @@ const Game = {
 
         // Enemies
         for (const e of this.enemies) if (!e.dead) e.render(ctx);
+
+        // Allies (minions)
+        if (this.allies) for (const a of this.allies) if (!a.dead) a.render(ctx);
 
         // Player
         if (this.player) this.player.render(ctx);

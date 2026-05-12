@@ -97,16 +97,19 @@ const UI = {
     },
 
     _renderAbilities(ctx, p, game) {
-        const abilityDefs = [
-            { ab: p.abilities[0], key: 'J', x: 660, y: 550 },
-            { ab: p.abilities[1], key: 'K', x: 700, y: 550 },
-            { ab: p.abilities[2], key: 'L', x: 740, y: 550 },
-        ];
+        const abs = p.abilities || [];
+        const count = abs.length;
+        if (count === 0) return;
+        const size = 34, gap = 6;
+        const totalW = count * (size + gap) - gap;
+        const startX = 800 - totalW - 8;
+        const y = 555;
 
-        for (const {ab, key, x, y} of abilityDefs) {
-            const size = 34;
-            const cx = x, cy = y;
-            // Background
+        abs.forEach((ab, i) => {
+            if (!ab) return;
+            const cx = startX + i * (size + gap) + size / 2;
+            const cy = y + size / 2;
+
             ctx.fillStyle = '#222233';
             ctx.strokeStyle = '#444466';
             ctx.lineWidth = 1.5;
@@ -114,11 +117,9 @@ const UI = {
             ctx.roundRect(cx - size/2, cy - size/2, size, size, 5);
             ctx.fill(); ctx.stroke();
 
-            // Icon
             Assets.draw(ctx, ab.iconKey, cx - size/2 + 3, cy - size/2 + 3, size-6, size-6);
 
-            // Cooldown overlay
-            if (ab.cooldown > 0) {
+            if (ab.cooldown > 0 && ab.maxCooldown > 0) {
                 const frac = ab.cooldown / ab.maxCooldown;
                 ctx.fillStyle = 'rgba(0,0,0,0.65)';
                 ctx.beginPath();
@@ -127,19 +128,18 @@ const UI = {
                 ctx.closePath();
                 ctx.fill();
                 ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 11px monospace';
+                ctx.font = 'bold 10px monospace';
                 ctx.textAlign = 'center';
                 ctx.fillText(ab.cooldown.toFixed(1), cx, cy + 4);
                 ctx.textAlign = 'left';
             }
 
-            // Key label
             ctx.fillStyle = '#aaaacc';
-            ctx.font = 'bold 10px monospace';
+            ctx.font = 'bold 9px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(key, cx, cy + size/2 + 12);
+            ctx.fillText(ab.label || ab.key || String(i), cx, cy + size/2 + 10);
             ctx.textAlign = 'left';
-        }
+        });
     },
 
     _renderBossBar(ctx, boss) {
@@ -216,7 +216,7 @@ const UI = {
         ctx.fillStyle = '#887799';
         ctx.font = '14px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('Auto-attack roguelite • 3 Classes • 10 Floors', 400, 208);
+        ctx.fillText('Auto-attack roguelite • 12 Classes • 10 Floors', 400, 208);
 
         // Buttons
         const btns = [
@@ -266,74 +266,313 @@ const UI = {
         ctx.textAlign = 'left';
     },
 
-    renderClassSelect(ctx, hoverClass) {
+    renderClassSelect(ctx, saveData, hoverClass) {
         ctx.fillStyle = '#0a0810';
         ctx.fillRect(0, 0, 800, 600);
         ctx.fillStyle = '#ddaaff';
-        ctx.font = 'bold 36px monospace';
+        ctx.font = 'bold 30px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('CHOOSE YOUR CLASS', 400, 70);
+        ctx.fillText('SELECT CLASS', 400, 55);
 
-        const classes = [
-            { id:'knight', name:'Knight', color:'#2244aa', desc:['HP: 150','ATK: 15','SPD: 200','Range: 120'], perk:'85% incoming damage', spriteKey:'player_knight', x:160 },
-            { id:'mage',   name:'Mage',   color:'#662288', desc:['HP: 80', 'ATK: 25','SPD: 180','Range: 200'], perk:'+50% Ability damage', spriteKey:'player_mage',   x:400 },
-            { id:'rogue',  name:'Rogue',  color:'#226644', desc:['HP: 100','ATK: 12','SPD: 280','Range: 150'], perk:'+50% Attack speed',   spriteKey:'player_rogue',  x:640 },
-        ];
+        const unlocked = (saveData && saveData.unlockedClasses) || ['human_adventurer'];
+        const selected = (saveData && saveData.selectedClass) || 'human_adventurer';
+        const cardW = 160, cardH = 200, gapX = 20;
+        const perRow = Math.min(unlocked.length, 4);
+        const totalW = perRow * cardW + (perRow-1)*gapX;
+        const startX = (800 - totalW) / 2;
 
-        for (const c of classes) {
-            const isHover = hoverClass === c.id;
-            const w = 190, h = 360, x = c.x - w/2, y = 110;
+        unlocked.forEach((id, i) => {
+            const classDef = (typeof ClassSystem !== 'undefined') ? ClassSystem.get(id) : null;
+            const col = i % perRow, row = Math.floor(i / perRow);
+            const cx = startX + col*(cardW+gapX), cy = 80 + row*220;
+            const isHover = hoverClass === id;
+            const isSelected = selected === id;
+            const rarity = classDef ? classDef.rarity : 'common';
+            const rarityColor = (typeof RARITY_COLORS !== 'undefined') ? RARITY_COLORS[rarity] : '#888';
 
-            ctx.fillStyle = isHover ? c.color : 'rgba(20,15,30,0.9)';
-            ctx.strokeStyle = isHover ? '#aaccff' : '#443355';
-            ctx.lineWidth = 2;
+            ctx.fillStyle = isHover ? '#2a1a3a' : '#130f1e';
+            ctx.strokeStyle = isSelected ? '#ffdd44' : (isHover ? rarityColor : '#443355');
+            ctx.lineWidth = isSelected ? 3 : (isHover ? 2 : 1.5);
             ctx.beginPath();
-            ctx.roundRect(x, y, w, h, 12);
+            ctx.roundRect(cx, cy, cardW, cardH, 10);
             ctx.fill(); ctx.stroke();
 
+            // Rarity tag
+            ctx.fillStyle = rarityColor;
+            ctx.font = 'bold 9px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(rarity.toUpperCase(), cx + cardW/2, cy + 13);
+
             // Sprite
-            Assets.draw(ctx, c.spriteKey, c.x - 40, y + 15, 80, 80);
+            const spriteKey = classDef ? classDef.spriteKey : 'player_adventurer';
+            Assets.draw(ctx, spriteKey, cx + cardW/2 - 24, cy + 18, 48, 48);
 
             // Name
             ctx.fillStyle = isHover ? '#ffffff' : '#ddaaff';
-            ctx.font = 'bold 20px monospace';
-            ctx.fillText(c.name, c.x, y + 118);
+            ctx.font = 'bold 11px monospace';
+            const name = classDef ? classDef.name : id;
+            // Word-wrap name
+            let nWords = name.split(' '), nLine = '', nLy = cy + 82;
+            for (const w of nWords) {
+                if ((nLine + w).length > 14) { ctx.fillText(nLine.trim(), cx + cardW/2, nLy); nLine = w + ' '; nLy += 13; }
+                else nLine += w + ' ';
+            }
+            ctx.fillText(nLine.trim(), cx + cardW/2, nLy);
 
             // Stats
-            ctx.fillStyle = '#aaaacc';
-            ctx.font = '13px monospace';
-            let sy = y + 142;
-            for (const stat of c.desc) {
-                ctx.fillText(stat, c.x - 80, sy);
-                sy += 20;
+            if (classDef) {
+                ctx.fillStyle = '#aaaacc'; ctx.font = '9px monospace';
+                ctx.fillText(`HP:${classDef.maxHp} ATK:${classDef.baseAtk}`, cx + cardW/2, cy + 112);
+                ctx.fillText(`SPD:${classDef.moveSpeed}`, cx + cardW/2, cy + 124);
             }
 
-            // Perk
-            ctx.fillStyle = '#88ffaa';
-            ctx.font = 'bold 11px monospace';
-            ctx.fillText('PERK:', c.x - 80, sy + 8);
-            ctx.fillStyle = '#66dd88';
-            ctx.font = '11px monospace';
-            const words = c.perk.split(' ');
-            let line = '', ly = sy + 24;
-            for (const w2 of words) {
-                if (line.length + w2.length > 16) {
-                    ctx.fillText(line, c.x - 80, ly); line = w2 + ' '; ly += 15;
-                } else line += w2 + ' ';
+            // Passive
+            if (classDef && classDef.passiveDesc) {
+                ctx.fillStyle = '#88ffaa'; ctx.font = '8px monospace';
+                const pd = classDef.passiveDesc;
+                const maxChars = 22;
+                if (pd.length > maxChars) {
+                    ctx.fillText(pd.slice(0, maxChars), cx+cardW/2, cy+140);
+                    ctx.fillText(pd.slice(maxChars), cx+cardW/2, cy+151);
+                } else {
+                    ctx.fillText(pd, cx+cardW/2, cy+140);
+                }
             }
-            if (line) ctx.fillText(line, c.x - 80, ly);
 
-            // Click prompt
-            if (isHover) {
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 13px monospace';
-                ctx.fillText('[ CLICK ]', c.x - 30, y + h - 15);
+            // Abilities count
+            if (classDef) {
+                ctx.fillStyle = '#8888ff'; ctx.font = '9px monospace';
+                ctx.fillText(`${classDef.abilityIds.length} abilities`, cx+cardW/2, cy+163);
+            }
+
+            // Selected badge / click hint
+            if (isSelected) {
+                ctx.fillStyle = '#ffdd44';
+                ctx.font = 'bold 9px monospace';
+                ctx.fillText('EQUIPPED', cx + cardW/2, cy + cardH - 8);
+            } else if (isHover) {
+                ctx.fillStyle = '#ccccff';
+                ctx.font = 'bold 9px monospace';
+                ctx.fillText('[CLICK TO PLAY]', cx + cardW/2, cy + cardH - 8);
+            }
+        });
+
+        ctx.textAlign = 'left';
+
+        // Buttons row at bottom
+        const rollCost = (saveData && saveData.rollCost) || 20;
+        const canAfford = saveData && saveData.crystals >= rollCost;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 525, 800, 75);
+
+        // Back
+        ctx.fillStyle = '#332244'; ctx.strokeStyle = '#665577'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(20, 535, 140, 30, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ccbbdd'; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('← BACK', 90, 555);
+
+        // Collection
+        ctx.fillStyle = '#1a1a44'; ctx.strokeStyle = '#4444aa'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(600, 492, 180, 33, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#aabbff'; ctx.font = 'bold 12px monospace';
+        ctx.fillText('📖 COLLECTION', 690, 513);
+
+        // Roll
+        ctx.fillStyle = canAfford ? '#2a1a00' : '#1a1a1a';
+        ctx.strokeStyle = canAfford ? '#aa6600' : '#443344'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(600, 531, 180, 33, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = canAfford ? '#ffcc44' : '#887799'; ctx.font = 'bold 12px monospace';
+        ctx.fillText(`🎲 ROLL (${rollCost}💎)`, 690, 552);
+
+        // Crystal count
+        ctx.fillStyle = '#cc88ff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'left';
+        ctx.fillText(`💎 ${(saveData && saveData.crystals) || 0}`, 180, 553);
+        ctx.textAlign = 'left';
+    },
+
+    renderClassCollection(ctx, saveData) {
+        ctx.fillStyle = '#0a0810';
+        ctx.fillRect(0, 0, 800, 600);
+
+        ctx.fillStyle = '#ddaaff';
+        ctx.font = 'bold 28px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('CLASS COLLECTION', 400, 45);
+
+        const allClasses = (typeof ClassSystem !== 'undefined') ? ClassSystem.all() : [];
+        const unlocked = (saveData && saveData.unlockedClasses) || ['human_adventurer'];
+        const shards = (saveData && saveData.classShards) || {};
+
+        const cardW = 105, cardH = 140, gapX = 8, gapY = 10;
+        const perRow = 6;
+        const totalW = perRow * cardW + (perRow-1)*gapX;
+        const startX = (800 - totalW) / 2;
+
+        allClasses.forEach((cls, i) => {
+            const isUnlocked = unlocked.includes(cls.id);
+            const col = i % perRow, row = Math.floor(i / perRow);
+            const cx = startX + col*(cardW+gapX), cy = 65 + row*(cardH+gapY);
+            const rarityColor = (typeof RARITY_COLORS !== 'undefined') ? RARITY_COLORS[cls.rarity] : '#888';
+
+            ctx.globalAlpha = isUnlocked ? 1 : 0.4;
+            ctx.fillStyle = '#131025';
+            ctx.strokeStyle = isUnlocked ? rarityColor : '#332233';
+            ctx.lineWidth = isUnlocked ? 2 : 1;
+            ctx.beginPath(); ctx.roundRect(cx, cy, cardW, cardH, 8); ctx.fill(); ctx.stroke();
+
+            // Portrait / sprite
+            if (isUnlocked) {
+                Assets.draw(ctx, cls.spriteKey, cx + cardW/2 - 20, cy + 8, 40, 40);
+            } else {
+                ctx.fillStyle = '#332244';
+                ctx.fillRect(cx + cardW/2 - 16, cy + 10, 32, 32);
+                ctx.fillStyle = '#443355'; ctx.font = 'bold 22px monospace'; ctx.textAlign = 'center';
+                ctx.fillText('?', cx + cardW/2, cy + 32);
+            }
+
+            // Rarity
+            ctx.fillStyle = rarityColor; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center';
+            ctx.fillText(cls.rarity.toUpperCase(), cx + cardW/2, cy + 55);
+
+            // Name
+            ctx.fillStyle = isUnlocked ? '#ddccff' : '#554466'; ctx.font = 'bold 9px monospace';
+            const words = cls.name.split(' ');
+            let line = '', ly = cy + 68;
+            for (const w of words) {
+                if ((line + w).length > 12) { ctx.fillText(line.trim(), cx+cardW/2, ly); line = w+' '; ly+=11; }
+                else line += w + ' ';
+            }
+            ctx.fillText(line.trim(), cx+cardW/2, ly);
+
+            if (isUnlocked) {
+                // Abilities count
+                ctx.fillStyle = '#8888ff'; ctx.font = '8px monospace';
+                ctx.fillText(`${cls.abilityIds.length} abilities`, cx+cardW/2, cy + 92);
+                // Passive snippet
+                ctx.fillStyle = '#88ffaa'; ctx.font = '7px monospace';
+                const pd = cls.passiveDesc || '';
+                ctx.fillText(pd.slice(0, 18), cx+cardW/2, cy+104);
+                if (pd.length > 18) ctx.fillText(pd.slice(18, 36), cx+cardW/2, cy+113);
+                // Shards
+                if (shards[cls.id]) {
+                    ctx.fillStyle = '#cc88ff'; ctx.font = '7px monospace';
+                    ctx.fillText(`${shards[cls.id]} shards`, cx+cardW/2, cy+cardH-6);
+                }
+            } else {
+                ctx.fillStyle = '#553366'; ctx.font = '8px monospace';
+                ctx.fillText('LOCKED', cx+cardW/2, cy+90);
+                ctx.fillText('Roll to unlock', cx+cardW/2, cy+101);
+            }
+
+            ctx.globalAlpha = 1;
+        });
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#887799'; ctx.font = '11px monospace';
+        ctx.fillText(`${unlocked.length} / ${allClasses.length} classes unlocked`, 400, 560);
+        this._menuButton(ctx, '← BACK', 400, 570, '#223344');
+        ctx.textAlign = 'left';
+    },
+
+    renderClassRoll(ctx, saveData, animActive, animPhase, animResult, animTimer) {
+        ctx.fillStyle = '#0a0810';
+        ctx.fillRect(0, 0, 800, 600);
+
+        ctx.fillStyle = '#ddaaff';
+        ctx.font = 'bold 32px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('CLASS ROLL', 400, 60);
+
+        const cost = (saveData && saveData.rollCost) || 20;
+        const crystals = (saveData && saveData.crystals) || 0;
+        const rollCount = (saveData && saveData.rollCount) || 0;
+        const canAfford = crystals >= cost;
+
+        // Stats
+        ctx.fillStyle = '#887799'; ctx.font = '14px monospace';
+        ctx.fillText(`Total rolls: ${rollCount}`, 400, 95);
+        ctx.fillStyle = '#cc88ff';
+        ctx.fillText(`💎 ${crystals} crystals`, 400, 118);
+
+        // Rarity odds display
+        const rarities = [
+            { r:'common',    pct:'60%', color:'#888888' },
+            { r:'rare',      pct:'25%', color:'#4488ff' },
+            { r:'epic',      pct:'10%', color:'#aa44cc' },
+            { r:'legendary', pct:'4%',  color:'#ffaa00' },
+            { r:'mythic',    pct:'1%',  color:'#cc2222' },
+        ];
+        ctx.font = '12px monospace';
+        rarities.forEach((r, i) => {
+            const x = 100 + i * 130;
+            ctx.fillStyle = r.color;
+            ctx.fillText(r.r.toUpperCase(), x, 150);
+            ctx.fillStyle = '#cccccc';
+            ctx.fillText(r.pct, x, 165);
+        });
+
+        // Cost ladder display
+        ctx.fillStyle = '#887799'; ctx.font = '11px monospace';
+        ctx.fillText('Cost: 20 → 30 → ... → 100 (capped)', 400, 188);
+
+        // Animation / result area
+        const boxX = 250, boxY = 200, boxW = 300, boxH = 200;
+        ctx.fillStyle = '#1a1530';
+        ctx.strokeStyle = '#443355'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(boxX, boxY, boxW, boxH, 14); ctx.fill(); ctx.stroke();
+
+        if (!animActive || animPhase === 'idle') {
+            ctx.fillStyle = '#554466'; ctx.font = 'bold 18px monospace';
+            ctx.fillText('Press ROLL to start!', 400, 310);
+        } else if (animPhase === 'spinning') {
+            // Spinning rarity flash
+            const t = animTimer;
+            const flashColors = ['#888888','#4488ff','#aa44cc','#ffaa00','#cc2222'];
+            const fc = flashColors[Math.floor(t*12) % flashColors.length];
+            ctx.fillStyle = fc;
+            ctx.font = 'bold 24px monospace';
+            ctx.fillText('Rolling...', 400, 295);
+            ctx.font = '60px monospace';
+            ctx.fillText(['⚡','✨','🎲','💫','⭐'][Math.floor(t*8) % 5], 400, 345);
+        } else if (animPhase === 'reveal' && animResult) {
+            const rc = (typeof RARITY_COLORS !== 'undefined') ? RARITY_COLORS[animResult.rarity] : '#888';
+            ctx.fillStyle = rc;
+            ctx.font = 'bold 20px monospace';
+            ctx.fillText(animResult.rarity.toUpperCase(), 400, 230);
+
+            Assets.draw(ctx, animResult.spriteKey || 'player_adventurer', 364, 240, 72, 72);
+
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 18px monospace';
+            ctx.fillText(animResult.name, 400, 330);
+
+            if (animResult.isDuplicate) {
+                ctx.fillStyle = '#cc88ff'; ctx.font = '13px monospace';
+                ctx.fillText('DUPLICATE — Converted to shards!', 400, 355);
+                const bonusCrystals = { common:2, rare:4, epic:8, legendary:12, mythic:20 }[animResult.rarity] || 2;
+                ctx.fillStyle = '#ffcc44';
+                ctx.fillText(`+${bonusCrystals} 💎 crystals returned`, 400, 372);
+            } else {
+                ctx.fillStyle = '#44ff88'; ctx.font = 'bold 13px monospace';
+                ctx.fillText('NEW CLASS UNLOCKED!', 400, 357);
             }
         }
 
-        ctx.fillStyle = '#887799';
-        ctx.font = '13px monospace';
-        ctx.fillText('← Back', 30, 580);
+        // Roll button
+        ctx.fillStyle = canAfford ? (animPhase === 'idle' || !animActive ? '#2a1a00' : '#1a1a1a') : '#1a1a1a';
+        ctx.strokeStyle = canAfford ? '#aa6600' : '#443344'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(300, 430, 200, 44, 10); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = canAfford ? '#ffcc44' : '#665566'; ctx.font = 'bold 18px monospace';
+        ctx.fillText(`🎲 ROLL (${cost} 💎)`, 400, 458);
+
+        if (!canAfford) {
+            ctx.fillStyle = '#cc4444'; ctx.font = '11px monospace';
+            ctx.fillText('Not enough crystals!', 400, 488);
+        }
+
+        ctx.fillStyle = '#554466'; ctx.font = '12px monospace';
+        ctx.fillText('Next cost: ' + Math.min(cost + 10, 100) + ' 💎', 400, 510);
+
+        this._menuButton(ctx, '← BACK', 400, 560, '#223344');
         ctx.textAlign = 'left';
     },
 

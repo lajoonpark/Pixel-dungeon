@@ -1,75 +1,101 @@
 'use strict';
 
 class Player {
-    constructor(cls) {
-        // Class base stats
-        const CLASSES = {
-            knight: { maxHp:150, baseAtk:15, moveSpeed:200, range:120, spriteKey:'player_knight', name:'Knight' },
-            mage:   { maxHp:80,  baseAtk:25, moveSpeed:180, range:200, spriteKey:'player_mage',   name:'Mage',   isMage:true },
-            rogue:  { maxHp:100, baseAtk:12, moveSpeed:280, range:150, spriteKey:'player_rogue',  name:'Rogue',  isRogue:true },
-        };
-        const c = CLASSES[cls] || CLASSES.knight;
-        Object.assign(this, c);
+    constructor(classId) {
+        const classDef = (typeof ClassSystem !== 'undefined' && ClassSystem.get(classId))
+            || { id: classId, maxHp: 120, baseAtk: 14, moveSpeed: 220, range: 140,
+                 spriteKey: 'player_adventurer', name: 'Human Adventurer',
+                 applyPassive() {}, abilityIds: ['quick_slash','dash_strike'] };
 
-        this.cls = cls;
+        this.classDef   = classDef;
+        this.cls        = classDef.id;
+        this.maxHp      = classDef.maxHp;
+        this.baseAtk    = classDef.baseAtk;
+        this.moveSpeed  = classDef.moveSpeed;
+        this.range      = classDef.range;
+        this.spriteKey  = classDef.spriteKey || 'player_adventurer';
+        this.name       = classDef.name;
+
         this.x = 100;
         this.y = 300;
         this.hp = this.maxHp;
 
         // Multipliers (upgraded via upgrade cards)
-        this.atkMult = 1;
-        this.atkSpeedMult = this.isRogue ? 1.5 : 1;
-        this.moveSpeedMult = 1;
+        this.atkMult             = 1;
+        this.atkSpeedMult        = 1;
+        this.moveSpeedMult       = 1;
         this.abilityCooldownMult = 1;
+        this.abilityDmgMult      = 1;
+        this.poisonDmgMult       = 1;
+        this.minionBuff          = 1;
+        this.healingMult         = 1;
+        this.burnDurationMult    = 1;
+        this.critDmgBonus        = 0;
 
         // Auto-attack state
-        this.atkCooldown = 0;
-        this.baseAtkSpeed = this.isRogue ? 0.6 : 1.0; // seconds between attacks
-        this.multiShot = 1;
-        this.critChance = 0;
-        this.lifeSteal = 0;
-        this.thorns = 0;
-        this.regen = 0;
-        this.regenTimer = 0;
-        this.onHitBurnChance = 0;
+        this.atkCooldown   = 0;
+        this.baseAtkSpeed  = 1.0;
+        this.multiShot     = 1;
+        this.critChance    = 0;
+        this.lifeSteal     = 0;
+        this.thorns        = 0;
+        this.regen         = 0;
+        this.regenTimer    = 0;
+        this.onHitBurnChance   = 0;
         this.onHitPoisonChance = 0;
+        this.onHitSlow         = false;
+        this.lightningChain    = 0;
 
-        // Ability upgrades
+        // Legacy compat (upgrade system references these)
         this.fireballDmgMult = 1;
         this.fireballAoeMult = 1;
-        this.fireballCDMult = 1;
-        this.novaDmgMult = 1;
-        this.novaRadiusMult = 1;
+        this.fireballCDMult  = 1;
+        this.novaDmgMult     = 1;
+        this.novaRadiusMult  = 1;
+        this.isMage   = false;
+        this.isRogue  = false;
+
+        // Apply class passive
+        if (classDef.applyPassive) classDef.applyPassive(this);
 
         // Level & XP
-        this.level = 1;
-        this.xp = 0;
+        this.level    = 1;
+        this.xp       = 0;
         this.xpToNext = 100;
 
-        // Abilities
-        this.abilities = [
-            new FireballAbility(this),
-            new DashAbility(this),
-            new IceNovaAbility(this),
-        ];
+        // Build abilities from class definition
+        this.abilities = (typeof ClassSystem !== 'undefined')
+            ? ClassSystem.buildAbilities(this, classDef)
+            : [new FireballAbility(this), new DashAbility(this), new IceNovaAbility(this)];
+
+        // Bonus crystals
+        this.bonusCrystals = 0;
 
         // Visual
-        this.hitFlash = 0;
-        this.invincible = false;
+        this.hitFlash       = 0;
+        this.invincible     = false;
         this.invincibleTimer = 0;
-        this.frozen = false;
-        this.statusEffects = [];
+        this.frozen         = false;
+        this.statusEffects  = [];
         this.kbVx = 0;
         this.kbVy = 0;
-        this.facing = 1; // 1 = right, -1 = left
+        this.facing   = 1;
         this.animTimer = 0;
 
-        // Mage bonus tracking
-        this.bonusCrystals = 0;
+        // Class-specific state
+        this._frostArmor  = false;
+        this._stealth     = false;
+        this.chronoRepeatTimer    = 0;
+        this.chronoRepeatInterval = 999;
     }
 
     get atkInterval() {
         return this.baseAtkSpeed / this.atkSpeedMult;
+    }
+
+    /** Find the dash ability by isDash flag */
+    get dashAbility() {
+        return this.abilities.find(a => a.isDash) || null;
     }
 
     applyEffect(type) {
@@ -86,8 +112,7 @@ class Player {
             : ((sourceOrContext && typeof sourceOrContext === 'object') ? sourceOrContext : null);
 
         amount = Number.isFinite(amount) ? amount : 0;
-        // Reduce if knight
-        if (this.cls === 'knight') amount *= 0.85;
+        if (this._frostArmor) amount *= 0.6; // Frost Armor: 40% damage reduction
         this.hp = Math.max(0, this.hp - amount);
         this.hitFlash = 0.25;
         this.invincible = true;
@@ -180,18 +205,19 @@ class Player {
         // Hazard tiles
         if (game.currentRoom) {
             const tileType = game.currentRoom.tileAt(this.x, this.y);
-            if (tileType === TILE.SPIKE) { // spike
+            if (tileType === TILE.SPIKE) {
                 if (!this._spikeTimer) this._spikeTimer = 0;
                 this._spikeTimer += dt;
                 if (this._spikeTimer > 0.5) { this._spikeTimer = 0; this.takeDamage(8, game); }
-            } else if (tileType === TILE.POISON) { // poison puddle
+            } else if (tileType === TILE.POISON) {
                 this.applyEffect('poison');
             }
         }
 
-        // Auto-attack
-        const dashAbility = this.abilities[1];
-        if (!dashAbility.dashing) {
+        // Auto-attack (pause during dash)
+        const dash = this.dashAbility;
+        const isDashing = dash && dash.dashing;
+        if (!isDashing) {
             this.atkCooldown -= dt;
             if (this.atkCooldown <= 0) {
                 const targets = this._getAutoTargets(game);
@@ -206,12 +232,34 @@ class Player {
         for (const ab of this.abilities) {
             if (ab.update) ab.update(dt, game);
         }
+
+        // Chronomancer slow aura
+        if (this.chronoSlowAura) {
+            for (const e of game.enemies) {
+                if (e.dead) continue;
+                const ex = e.x - this.x, ey = e.y - this.y;
+                if (ex*ex+ey*ey < 200*200) {
+                    e._slowTimer = Math.max(e._slowTimer || 0, 0.15);
+                    e._slowMult = Math.min(e._slowMult || 1, 0.85);
+                }
+            }
+        }
+
+        // Chronomancer auto-repeat passive
+        if (this.chronoRepeatInterval < 999) {
+            this.chronoRepeatTimer += dt;
+            if (this.chronoRepeatTimer >= this.chronoRepeatInterval) {
+                this.chronoRepeatTimer = 0;
+                // Auto-use first available non-dash ability
+                const ab = this.abilities.find(a => !a.isDash && a.canUse && a.canUse());
+                if (ab) ab.use(game);
+            }
+        }
     }
 
     _getAutoTargets(game) {
         const enemies = game.enemies.filter(e => !e.dead);
         if (enemies.length === 0) return [];
-        // Sort by distance
         const sorted = enemies.map(e => {
             const dx = e.x - this.x, dy = e.y - this.y;
             return { e, dist: Math.sqrt(dx*dx+dy*dy) };
@@ -226,7 +274,8 @@ class Player {
         let dmg = this.baseAtk * this.atkMult;
         let isCrit = false;
         if (this.critChance > 0 && Math.random() < this.critChance) {
-            dmg *= 2;
+            const critMult = 2 + (this.critDmgBonus || 0);
+            dmg *= critMult;
             isCrit = true;
         }
 
@@ -242,8 +291,7 @@ class Player {
             maxLife: 2,
             onHit: (enemy, gm) => {
                 if (this.lifeSteal > 0) {
-                    const healed = dmg * this.lifeSteal;
-                    this.hp = Math.min(this.maxHp, this.hp + healed);
+                    this.hp = Math.min(this.maxHp, this.hp + dmg * this.lifeSteal);
                 }
                 if (this.onHitBurnChance > 0 && Math.random() < this.onHitBurnChance) {
                     enemy.applyEffect('burn', this.baseAtk * this.atkMult);
@@ -251,12 +299,13 @@ class Player {
                 if (this.onHitPoisonChance > 0 && Math.random() < this.onHitPoisonChance) {
                     enemy.applyEffect('poison', 0);
                 }
-                if (isCrit) {
-                    if (gm && typeof gm.addDamageNumber === 'function') {
-                        gm.addDamageNumber(enemy.x, enemy.y - 30, Math.ceil(dmg), '#ffff44', { big: true, role: 'enemy' });
-                    }
+                if (this.onHitSlow) {
+                    enemy._slowTimer = (enemy._slowTimer || 0) + 1;
+                    enemy._slowMult = Math.min(enemy._slowMult || 1, 0.6);
                 }
-                // Thorns knockback
+                if (isCrit && gm && typeof gm.addDamageNumber === 'function') {
+                    gm.addDamageNumber(enemy.x, enemy.y - 30, Math.ceil(dmg), '#ffff44', { big: true, role: 'enemy' });
+                }
                 if (this.thorns > 0) enemy.knockback(this.x, this.y, 120);
             }
         });
@@ -266,15 +315,17 @@ class Player {
     render(ctx) {
         ctx.save();
 
+        // Stealth: semi-transparent
+        if (this._stealth) ctx.globalAlpha = 0.4;
+
         // Invincibility flicker
         if (this.invincible && Math.floor(Date.now()/80) % 2 === 0) {
-            ctx.globalAlpha = 0.4;
+            ctx.globalAlpha = Math.min(ctx.globalAlpha || 1, 0.4);
         }
 
         if (this.hitFlash > 0) ctx.filter = `brightness(${2 + this.hitFlash*3})`;
 
         const s = 48;
-        // Flip for facing direction
         if (this.facing < 0) {
             ctx.translate(this.x, this.y);
             ctx.scale(-1, 1);
@@ -287,6 +338,15 @@ class Player {
         ctx.globalAlpha = 1;
         ctx.restore();
 
+        // Frost armor ring
+        if (this._frostArmor) {
+            ctx.strokeStyle = '#88ccff';
+            ctx.globalAlpha = 0.6 + Math.sin(Date.now()/150)*0.3;
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(this.x, this.y, 30, 0, Math.PI*2); ctx.stroke();
+            ctx.globalAlpha = 1;
+        }
+
         // Status rings
         for (const eff of this.statusEffects) {
             ctx.strokeStyle = StatusEffects.getColor(eff.type);
@@ -297,5 +357,11 @@ class Player {
             ctx.stroke();
             ctx.globalAlpha = 1;
         }
+
+        // Shadow blades
+        for (const ab of this.abilities) {
+            if (ab.renderBlades) ab.renderBlades(ctx);
+        }
     }
 }
+
