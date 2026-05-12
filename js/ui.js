@@ -857,7 +857,7 @@ const UI = {
 
         ctx.fillStyle = '#cc8899';
         ctx.font = '11px monospace';
-        ctx.fillText('Delete Save resets progress to default values.', 400, 425);
+        ctx.fillText('delete save resets progress to default values.', 400, 425);
         ctx.textAlign = 'left';
     },
 

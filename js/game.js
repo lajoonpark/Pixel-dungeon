@@ -17,7 +17,7 @@ const STATES = {
 };
 
 const TOTAL_ROOMS = 10;
-const DEFAULT_ABILITY_COUNT = 2;
+const DEFAULT_ABILITY_KEY_COUNT = 2;
 const ABILITY_HINT_KEYS = ['J', 'K', 'L', 'U', 'I'];
 
 const Game = {
@@ -455,7 +455,7 @@ const Game = {
         if (!infoEl) return;
 
         const activeClassId = classId || (this.saveData && this.saveData.selectedClass) || 'human_adventurer';
-        let abilityCount = DEFAULT_ABILITY_COUNT;
+        let abilityCount = DEFAULT_ABILITY_KEY_COUNT;
         if (typeof ClassSystem !== 'undefined') {
             const classDef = ClassSystem.get(activeClassId) || ClassSystem.get('human_adventurer');
             if (classDef && Array.isArray(classDef.abilityIds)) {
