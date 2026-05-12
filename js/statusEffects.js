@@ -20,7 +20,7 @@ const StatusEffects = {
     },
 
     // Update a status effect on an entity; returns true if expired
-    update(effect, entity, dt, allEnemies) {
+    update(effect, entity, dt, allEnemies, game) {
         effect.timer += dt;
 
         switch (effect.type) {
@@ -28,7 +28,7 @@ const StatusEffects = {
                 effect.tickTimer += dt;
                 while (effect.tickTimer >= effect.tickRate) {
                     effect.tickTimer -= effect.tickRate;
-                    entity.takeDamage(effect.dps * effect.tickRate, 'fire');
+                    entity.takeDamage(effect.dps * effect.tickRate, 'fire', game);
                 }
                 break;
             case 'freeze':
@@ -38,7 +38,7 @@ const StatusEffects = {
                 effect.tickTimer += dt;
                 while (effect.tickTimer >= effect.tickRate) {
                     effect.tickTimer -= effect.tickRate;
-                    entity.takeDamage(effect.dps * effect.tickRate, 'poison');
+                    entity.takeDamage(effect.dps * effect.tickRate, 'poison', game);
                 }
                 break;
             case 'bleed':
@@ -47,7 +47,7 @@ const StatusEffects = {
                     const dy = entity.y - effect.lastY;
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     if (dist > 4) {
-                        entity.takeDamage(effect.moveDamage * (dist / 20), 'bleed');
+                        entity.takeDamage(effect.moveDamage * (dist / 20), 'bleed', game);
                         effect.lastX = entity.x;
                         effect.lastY = entity.y;
                     }
@@ -64,7 +64,7 @@ const StatusEffects = {
                         if (e === entity || e.dead) continue;
                         const dx = e.x - entity.x, dy = e.y - entity.y;
                         if (dx*dx + dy*dy < 120*120) {
-                            e.takeDamage(effect.chainDamage, 'shock');
+                            e.takeDamage(effect.chainDamage, 'shock', game);
                             break;
                         }
                     }

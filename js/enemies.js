@@ -29,9 +29,18 @@ class Enemy {
         this.crystalChance = cfg.crystalChance || 0;
     }
 
-    takeDamage(amount, type) {
+    takeDamage(amount, type, game, options) {
+        amount = Number.isFinite(amount) ? amount : 0;
         this.hp -= amount;
         this.hitFlash = 0.18;
+        const opts = (options && typeof options === 'object') ? options : {};
+        // Show by default when a valid game reference exists; callers can disable via showNumber:false.
+        if (game && typeof game.addDamageNumber === 'function' && opts.showNumber !== false) {
+            game.addDamageNumber(this.x, this.y - this.size - 10, Math.ceil(amount), opts.color || '#ffee44', {
+                big: !!opts.big,
+                role: 'enemy'
+            });
+        }
         if (this.hp <= 0) { this.hp = 0; this.dead = true; }
     }
 
@@ -59,7 +68,7 @@ class Enemy {
 
         // Status effects
         this.frozen = false;
-        this.statusEffects = this.statusEffects.filter(e => !StatusEffects.update(e, this, dt, game.enemies));
+        this.statusEffects = this.statusEffects.filter(e => !StatusEffects.update(e, this, dt, game.enemies, game));
 
         if (this.frozen) return;
 
