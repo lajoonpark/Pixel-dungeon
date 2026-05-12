@@ -13,9 +13,12 @@ const STATES = {
     VICTORY:           'victory',
     SHOP:              'shop',
     HELP:              'help',
+    SETTINGS:          'settings',
 };
 
 const TOTAL_ROOMS = 10;
+const DEFAULT_ABILITY_KEY_COUNT = 2;
+const ABILITY_HINT_KEYS = ['J', 'K', 'L', 'U', 'I'];
 
 const Game = {
     state: STATES.LOADING,
@@ -71,6 +74,7 @@ const Game = {
         this.ctx = this.canvas.getContext('2d');
         this.saveData = SaveSystem.load();
         this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        this._updateControlHintText();
 
         this._setupInput();
         this._setupMobileControls();
@@ -188,6 +192,8 @@ const Game = {
             if (code === 'Digit3') this._selectUpgrade(2);
         } else if (this.state === STATES.CLASS_COLLECTION || this.state === STATES.CLASS_ROLL) {
             if (code === 'Escape') { this.state = STATES.CLASS_SELECT; }
+        } else if (this.state === STATES.SETTINGS) {
+            if (code === 'Escape') { this.state = STATES.MENU; }
         }
     },
 
@@ -195,7 +201,7 @@ const Game = {
         const mx = this.mouse.x, my = this.mouse.y;
         if (this.state === STATES.MENU) {
             const btns = [
-                { id:'play',  y:270 }, { id:'shop', y:330 }, { id:'help', y:390 }
+                { id:'play', y:245 }, { id:'shop', y:300 }, { id:'help', y:355 }, { id:'settings', y:410 }
             ];
             this.hoverBtn = null;
             for (const b of btns) {
@@ -238,13 +244,14 @@ const Game = {
     _onClick(mx, my) {
         if (this.state === STATES.MENU) {
             const btns = [
-                { id:'play',  y:270 }, { id:'shop', y:330 }, { id:'help', y:390 }
+                { id:'play', y:245 }, { id:'shop', y:300 }, { id:'help', y:355 }, { id:'settings', y:410 }
             ];
             for (const b of btns) {
                 if (mx >= 260 && mx <= 540 && my >= b.y && my <= b.y + 44) {
                     if (b.id === 'play')  this.state = STATES.CLASS_SELECT;
                     if (b.id === 'shop')  this.state = STATES.SHOP;
                     if (b.id === 'help')  this.state = STATES.HELP;
+                    if (b.id === 'settings') this.state = STATES.SETTINGS;
                     return;
                 }
             }
@@ -267,6 +274,7 @@ const Game = {
                 if (mx >= cx && mx <= cx+cardW && my >= cy && my <= cy+cardH) {
                     this.saveData.selectedClass = id;
                     SaveSystem.save(this.saveData);
+                    this._updateControlHintText(id);
                     this._startRun(id);
                 }
             });
@@ -308,6 +316,16 @@ const Game = {
             if (my >= 465 && my <= 505 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
         } else if (this.state === STATES.HELP) {
             if (my >= 540 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
+        } else if (this.state === STATES.SETTINGS) {
+            if (my >= 300 && my <= 340 && mx >= 290 && mx <= 510) {
+                if (window.confirm('Delete all save data? This cannot be undone.')) {
+                    this.saveData = SaveSystem.reset();
+                    this._updateControlHintText();
+                    this.state = STATES.MENU;
+                }
+                return;
+            }
+            if (my >= 360 && my <= 400 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
         }
     },
 
@@ -430,6 +448,23 @@ const Game = {
             this.saveData.permanentUpgrades[pu.id] = rank + 1;
             SaveSystem.save(this.saveData);
         }
+    },
+
+    _updateControlHintText(classId) {
+        const infoEl = document.getElementById('info');
+        if (!infoEl) return;
+
+        const activeClassId = classId || (this.saveData && this.saveData.selectedClass) || 'human_adventurer';
+        let abilityCount = DEFAULT_ABILITY_KEY_COUNT;
+        if (typeof ClassSystem !== 'undefined') {
+            const classDef = ClassSystem.get(activeClassId) || ClassSystem.get('human_adventurer');
+            if (classDef && Array.isArray(classDef.abilityIds)) {
+                abilityCount = classDef.abilityIds.length;
+            }
+        }
+        abilityCount = Math.max(0, Math.min(5, abilityCount));
+        const keyLabels = ABILITY_HINT_KEYS.slice(0, abilityCount).join(' ');
+        infoEl.textContent = `WASD/Arrows · ${keyLabels} Abilities · Click to interact`;
     },
 
     nearestEnemy(x, y, maxDist) {
@@ -725,6 +760,9 @@ const Game = {
                 break;
             case STATES.SHOP:
                 UI.renderShop(ctx, this.saveData, this.hoverShopItem);
+                break;
+            case STATES.SETTINGS:
+                UI.renderSettings(ctx, this.saveData);
                 break;
         }
 

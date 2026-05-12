@@ -175,7 +175,7 @@ class Room {
             const radius = ENEMY_SPAWN_RADII[type] || 20;
             const pos = this.getSafeSpawnPosition(radius, playerX, playerY);
             if (!pos) continue; // skip rather than spawn in a wall
-            const e = createEnemy(type, pos.x, pos.y, isElite);
+            const e = createEnemy(type, pos.x, pos.y, { isElite });
             // Scale HP and ATK with room index
             e.hp = Math.floor(e.hp * scaleFactor);
             e.maxHp = e.hp;

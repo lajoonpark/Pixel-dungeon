@@ -681,7 +681,7 @@ class RaiseSkeletonAbility {
     use(game) {
         if (!this.canUse()) return false;
         const p=this.player, buff=p.minionBuff||1;
-        const minion=new Minion(p.x+(Math.random()-0.5)*60, p.y+40, p, {
+        const minion=new SummonedMinion(p.x+(Math.random()-0.5)*60, p.y+40, p, {
             hp:60*buff, atk:12*buff, speed:90, range:50, atkInterval:1.2, duration:20,
             color:'#ccddbb', spriteKey:'enemy_skeleton'
         });
@@ -1315,7 +1315,7 @@ class CollapseAbility {
 //  MINION
 // ══════════════════════════════════════════════════════════════════════════════
 
-class Minion {
+class SummonedMinion {
     constructor(x, y, owner, opts) {
         this.x=x; this.y=y; this.owner=owner;
         this.hp=opts.hp||50; this.maxHp=this.hp;

@@ -540,7 +540,11 @@ class Necromancer extends Enemy {
 }
 
 // ── Enemy factory ─────────────────────────────────────────────────────────────
-function createEnemy(type, x, y, isElite) {
+function createEnemy(type, x, y, options) {
+    const opts = (typeof options === 'boolean')
+        ? { isElite: options }
+        : ((options && typeof options === 'object') ? options : {});
+    const isElite = !!opts.isElite;
     switch(type) {
         case 'slime':     return new Slime(x, y, isElite);
         case 'bat':       return new Bat(x, y, isElite);
@@ -553,4 +557,8 @@ function createEnemy(type, x, y, isElite) {
         case 'boss_necromancer': return new Necromancer(x, y);
         default: return new Slime(x, y, isElite);
     }
+}
+
+if (typeof window !== 'undefined') {
+    window.createEnemy = createEnemy;
 }

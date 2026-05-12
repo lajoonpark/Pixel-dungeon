@@ -220,9 +220,10 @@ const UI = {
 
         // Buttons
         const btns = [
-            { id:'play',  label:'▶  START RUN',   y:270, color:'#2244aa', hover:'#3355cc' },
-            { id:'shop',  label:'🛒 UPGRADES',     y:330, color:'#442200', hover:'#664400' },
-            { id:'help',  label:'?  HOW TO PLAY', y:390, color:'#224422', hover:'#336633' },
+            { id:'play',     label:'▶  START RUN',   y:245, color:'#2244aa', hover:'#3355cc' },
+            { id:'shop',     label:'🛒 UPGRADES',    y:300, color:'#442200', hover:'#664400' },
+            { id:'help',     label:'?  HOW TO PLAY', y:355, color:'#224422', hover:'#336633' },
+            { id:'settings', label:'⚙  SETTINGS',    y:410, color:'#332244', hover:'#554477' },
         ];
 
         for (const b of btns) {
@@ -833,6 +834,30 @@ const UI = {
         }
 
         this._menuButton(ctx, '← Back', 400, 560, '#223344');
+        ctx.textAlign = 'left';
+    },
+
+    renderSettings(ctx, saveData) {
+        ctx.fillStyle = '#0a0810';
+        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillStyle = '#ddaaff';
+        ctx.font = 'bold 30px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('SETTINGS', 400, 90);
+
+        ctx.fillStyle = '#887799';
+        ctx.font = '13px monospace';
+        ctx.fillText('Manage your local save data.', 400, 130);
+
+        ctx.fillStyle = '#aaaacc';
+        ctx.fillText(`Crystals: ${(saveData && saveData.crystals) || 0}  •  Runs: ${(saveData && saveData.totalRuns) || 0}`, 400, 170);
+
+        this._menuButton(ctx, 'DELETE SAVE', 400, 300, '#552233');
+        this._menuButton(ctx, '← Back', 400, 360, '#223344');
+
+        ctx.fillStyle = '#cc8899';
+        ctx.font = '11px monospace';
+        ctx.fillText('delete save resets progress to default values.', 400, 425);
         ctx.textAlign = 'left';
     },
 
