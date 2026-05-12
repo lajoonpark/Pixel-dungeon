@@ -52,6 +52,16 @@ class Player {
         this.fireballCDMult  = 1;
         this.novaDmgMult     = 1;
         this.novaRadiusMult  = 1;
+        this.quickSlashDmgMult = 1;
+        this.quickSlashRadiusMult = 1;
+        this.quickSlashCDMult = 1;
+        this.dashStrikeDmgMult = 1;
+        this.dashStrikeDistanceMult = 1;
+        this.dashStrikeCDMult = 1;
+        this.flameDashDurationMult = 1;
+        this.piercingArrowDmgMult = 1;
+        this.piercingArrowExtraPierce = 0;
+        this.rollDashCDMult = 1;
         this.isMage   = false;
         this.isRogue  = false;
 
@@ -364,4 +374,3 @@ class Player {
         }
     }
 }
-

@@ -42,7 +42,10 @@ const Game = {
     roomIndex: 0,
     coins: 0,
     killCount: 0,
-    runCrystals: 0,
+    runCrystalsEarned: 0,
+    startingCrystals: 0,
+    crystalTransactions: [],
+    isRunActive: false,
     upgradeChoices: [],
     scaleFactor: 1,
 
@@ -64,6 +67,7 @@ const Game = {
 
     // Persistent save data
     saveData: null,
+    crystals: 0,
 
     // Stability flags
     _loopRunning: false,
@@ -75,6 +79,7 @@ const Game = {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.saveData = SaveSystem.load();
+        this.crystals = this.saveData.crystals || 0;
         this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         this._updateControlHintText();
 
@@ -334,9 +339,7 @@ const Game = {
     _doRoll() {
         if (this.rollAnimActive) return;
         const cost = this.saveData.rollCost || 20;
-        if (this.saveData.crystals < cost) return; // can't afford
-
-        this.saveData.crystals -= cost;
+        if (!this.spendCrystals(cost, 'class_roll_cost')) return; // can't afford
         this.saveData.rollCount = (this.saveData.rollCount || 0) + 1;
         // Scale cost: +10 per roll, cap at 100
         this.saveData.rollCost = Math.min(100, cost + 10);
@@ -352,7 +355,7 @@ const Game = {
             this.saveData.classShards = this.saveData.classShards || {};
             this.saveData.classShards[result.id] = (this.saveData.classShards[result.id] || 0) + 1;
             const shardsBonus = { common:2, rare:4, epic:8, legendary:12, mythic:20 }[result.rarity] || 2;
-            this.saveData.crystals += shardsBonus;
+            this.addCrystals(shardsBonus, `class_roll_duplicate_${result.id}`, { countForRun: false });
         }
 
         SaveSystem.save(this.saveData);
@@ -368,7 +371,10 @@ const Game = {
         this.player = new Player(playerClass);
         this.coins = 0;
         this.killCount = 0;
-        this.runCrystals = 0;
+        this.runCrystalsEarned = 0;
+        this.startingCrystals = this.crystals || 0;
+        this.crystalTransactions = [];
+        this.isRunActive = true;
         this.projectiles = [];
         this.particles = [];
         this.damageNumbers = [];
@@ -431,7 +437,8 @@ const Game = {
 
     triggerLevelUp() {
         const prevState = this.state;
-        this.upgradeChoices = UpgradeSystem.roll(this.player, 3);
+        this.upgradeChoices = UpgradeSystem.roll(this.player, 3)
+            .filter(upg => UpgradeSystem.isUpgradeAllowed(this.player, upg));
         this.state = STATES.LEVELUP;
         this.hoverCard = -1;
         UI._hoveredCard = -1;
@@ -447,8 +454,7 @@ const Game = {
     _buyPermanentUpgrade(pu, i) {
         const rank = this.saveData.permanentUpgrades[pu.id] || 0;
         const cost = UpgradeSystem.permanentCost(pu, rank);
-        if (this.saveData.crystals >= cost && rank < pu.maxRank) {
-            this.saveData.crystals -= cost;
+        if (rank < pu.maxRank && this.spendCrystals(cost, `shop_upgrade_${pu.id}`)) {
             this.saveData.permanentUpgrades[pu.id] = rank + 1;
             SaveSystem.save(this.saveData);
         }
@@ -507,6 +513,64 @@ const Game = {
         });
     },
 
+    addCrystals(amount, reason, options = {}) {
+        amount = Math.max(0, Math.floor(amount || 0));
+        if (amount <= 0) return false;
+
+        const countForRun = options.countForRun !== false;
+        this.crystals = (this.crystals || 0) + amount;
+        this.saveData.crystals = this.crystals;
+
+        if (this.isRunActive && countForRun) {
+            this.runCrystalsEarned = (this.runCrystalsEarned || 0) + amount;
+        }
+
+        const tx = {
+            amount,
+            reason: reason || 'unknown',
+            roomNumber: this.isRunActive ? (this.roomIndex + 1) : null,
+            totalAfter: this.crystals,
+            runEarnedAfter: this.runCrystalsEarned || 0,
+            timestamp: new Date().toISOString()
+        };
+        if (!Array.isArray(this.crystalTransactions)) this.crystalTransactions = [];
+        this.crystalTransactions.push(tx);
+
+        SaveSystem.save(this.saveData);
+        console.log(`[PixelDungeon] +${amount} crystals (${tx.reason}). Run earned: ${tx.runEarnedAfter}, Total: ${this.crystals}`);
+        return true;
+    },
+
+    spendCrystals(amount, reason) {
+        amount = Math.max(0, Math.floor(amount || 0));
+        if (amount <= 0) return true;
+        if ((this.crystals || 0) < amount) return false;
+
+        this.crystals -= amount;
+        this.saveData.crystals = this.crystals;
+        SaveSystem.save(this.saveData);
+        console.log(`[PixelDungeon] -${amount} crystals (${reason || 'unknown'}). Total: ${this.crystals}`);
+        return true;
+    },
+
+    _finalizeRunCrystalAccounting(outcome) {
+        const actualDelta = (this.crystals || 0) - (this.startingCrystals || 0);
+        if (actualDelta !== (this.runCrystalsEarned || 0)) {
+            console.warn('[PixelDungeon] Crystal mismatch detected', {
+                outcome,
+                startingCrystals: this.startingCrystals || 0,
+                currentCrystals: this.crystals || 0,
+                actualDelta,
+                runCrystalsEarned: this.runCrystalsEarned || 0,
+                transactions: this.crystalTransactions || []
+            });
+        }
+        if (Array.isArray(this.crystalTransactions) && this.crystalTransactions.length > 0) {
+            console.table(this.crystalTransactions);
+        }
+        this.isRunActive = false;
+    },
+
     awardRoomClearCrystals(roomIndex) {
         if (!Number.isInteger(roomIndex)) return;
         if (this.claimedRoomCrystalRewards.has(roomIndex)) return;
@@ -523,8 +587,7 @@ const Game = {
             }
         }
 
-        this.saveData.crystals = (this.saveData.crystals || 0) + amount;
-        SaveSystem.save(this.saveData);
+        this.addCrystals(amount, `room_clear_${roomIndex + 1}`);
 
         if (this.player) {
             this.addDamageNumber(
@@ -542,19 +605,19 @@ const Game = {
     gameOver() {
         // Update best run
         if (this.roomIndex + 1 > this.saveData.bestRun.floor) {
-            this.saveData.bestRun = { floor: this.roomIndex+1, kills: this.killCount, crystals: this.runCrystals };
+            this.saveData.bestRun = { floor: this.roomIndex+1, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
         }
-        this.saveData.crystals += this.runCrystals;
         SaveSystem.save(this.saveData);
+        this._finalizeRunCrystalAccounting('game_over');
         this.state = STATES.GAMEOVER;
     },
 
     victory() {
         const bonusCrystals = 5 + Math.floor(this.killCount / 10);
-        this.runCrystals += bonusCrystals;
-        this.saveData.crystals += this.runCrystals;
-        this.saveData.bestRun = { floor: this.rooms.length, kills: this.killCount, crystals: this.runCrystals };
+        this.addCrystals(bonusCrystals, 'victory_bonus');
+        this.saveData.bestRun = { floor: this.rooms.length, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
         SaveSystem.save(this.saveData);
+        this._finalizeRunCrystalAccounting('victory');
         this.state = STATES.VICTORY;
     },
 
@@ -636,7 +699,7 @@ const Game = {
                             this.coins += e.coinReward || 0;
                             // Crystal drop
                             if (Math.random() < 0.08 + (e.crystalChance||0)) {
-                                this.runCrystals++;
+                                this.addCrystals(1, 'enemy_crystal_drop');
                                 this.addDamageNumber(e.x, e.y-50, 1, '#cc88ff');
                             }
                             spawnExplosion(this.particles, e.x, e.y, 8, ['#ffcc44','#ff8844','#ffffff'], 80, 4);
@@ -730,7 +793,7 @@ const Game = {
                     } else if (roll < 0.7) {
                         this.coins += 3 + Math.floor(Math.random()*4);
                     } else {
-                        this.runCrystals++;
+                        this.addCrystals(1, 'chest_crystal_reward');
                         this.addDamageNumber(ch.x, ch.y - 30, 1, '#cc88ff');
                     }
                     spawnExplosion(this.particles, ch.x, ch.y, 12, ['#ffcc44','#ffffff'], 100, 5);

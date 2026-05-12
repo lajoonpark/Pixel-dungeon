@@ -33,6 +33,7 @@ const CLASS_DEFS = {
         id: 'human_adventurer',
         name: 'Human Adventurer',
         rarity: 'common',
+        tags: ['human', 'adventurer', 'balanced'],
         maxHp: 120, baseAtk: 14, moveSpeed: 220, range: 140,
         spriteKey: 'player_adventurer',
         portraitKey: 'portrait_adventurer',
@@ -40,6 +41,22 @@ const CLASS_DEFS = {
         passiveIconKey: 'passive_adventurer',
         description: 'Balanced starter class. Simple, mobile, reliable.',
         abilityIds: ['quick_slash', 'dash_strike'],
+        abilities: [
+            {
+                id: 'quick_slash',
+                name: 'Quick Slash',
+                type: 'active',
+                tags: ['melee', 'damage', 'movement'],
+                upgradePool: ['quickSlashDamage', 'quickSlashRadius', 'quickSlashCooldown']
+            },
+            {
+                id: 'dash_strike',
+                name: 'Dash Strike',
+                type: 'active',
+                tags: ['dash', 'movement', 'damage'],
+                upgradePool: ['dashStrikeDistance', 'dashStrikeDamage', 'dashStrikeCooldown']
+            }
+        ],
         startUnlocked: true,
         applyPassive(player) {
             player.moveSpeedMult *= 1.1;
@@ -50,6 +67,7 @@ const CLASS_DEFS = {
         id: 'fire_mage',
         name: 'Fire Mage',
         rarity: 'common',
+        tags: ['mage', 'fire', 'ranged'],
         maxHp: 80, baseAtk: 20, moveSpeed: 185, range: 200,
         spriteKey: 'player_fire_mage',
         portraitKey: 'portrait_fire_mage',
@@ -57,6 +75,22 @@ const CLASS_DEFS = {
         passiveIconKey: 'passive_fire_mage',
         description: 'Fragile caster focused on burst damage and burn effects.',
         abilityIds: ['fireball_shot', 'flame_dash'],
+        abilities: [
+            {
+                id: 'fireball_shot',
+                name: 'Fireball',
+                type: 'active',
+                tags: ['fire', 'projectile', 'damage'],
+                upgradePool: ['fireballShotDamage', 'fireballShotAoe']
+            },
+            {
+                id: 'flame_dash',
+                name: 'Flame Dash',
+                type: 'active',
+                tags: ['dash', 'movement', 'fire'],
+                upgradePool: ['flameDashTrailDuration']
+            }
+        ],
         startUnlocked: false,
         applyPassive(player) {
             player.abilityDmgMult = (player.abilityDmgMult || 1) * 1.5;
@@ -67,6 +101,7 @@ const CLASS_DEFS = {
         id: 'ranger',
         name: 'Ranger',
         rarity: 'common',
+        tags: ['ranger', 'ranged', 'mobility'],
         maxHp: 90, baseAtk: 13, moveSpeed: 240, range: 260,
         spriteKey: 'player_ranger',
         portraitKey: 'portrait_ranger',
@@ -74,6 +109,22 @@ const CLASS_DEFS = {
         passiveIconKey: 'passive_ranger',
         description: 'Safe ranged class focused on positioning.',
         abilityIds: ['piercing_arrow', 'roll_dash'],
+        abilities: [
+            {
+                id: 'piercing_arrow',
+                name: 'Piercing Arrow',
+                type: 'active',
+                tags: ['ranged', 'projectile', 'damage'],
+                upgradePool: ['piercingArrowDamage', 'piercingArrowPierce']
+            },
+            {
+                id: 'roll_dash',
+                name: 'Roll Dash',
+                type: 'active',
+                tags: ['dash', 'movement'],
+                upgradePool: ['rollDashCooldown']
+            }
+        ],
         startUnlocked: false,
         applyPassive(player) {
             player.range = Math.floor(player.range * 1.2);
