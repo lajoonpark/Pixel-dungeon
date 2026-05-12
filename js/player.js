@@ -79,11 +79,11 @@ class Player {
         if (eff) this.statusEffects.push(eff);
     }
 
-    takeDamage(amount, sourceOrGame, maybeGame) {
+    takeDamage(amount, sourceOrContext, gameArg) {
         if (this.invincible) return;
-        const game = (maybeGame && typeof maybeGame === 'object')
-            ? maybeGame
-            : ((sourceOrGame && typeof sourceOrGame === 'object') ? sourceOrGame : null);
+        const game = (gameArg && typeof gameArg === 'object')
+            ? gameArg
+            : ((sourceOrContext && typeof sourceOrContext === 'object') ? sourceOrContext : null);
 
         amount = Number.isFinite(amount) ? amount : 0;
         // Reduce if knight

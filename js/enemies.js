@@ -34,6 +34,7 @@ class Enemy {
         this.hp -= amount;
         this.hitFlash = 0.18;
         const opts = (options && typeof options === 'object') ? options : {};
+        // Show by default when a valid game reference exists; callers can disable via showNumber:false.
         if (game && typeof game.addDamageNumber === 'function' && opts.showNumber !== false) {
             game.addDamageNumber(this.x, this.y - this.size - 10, Math.ceil(amount), opts.color || '#ffee44', {
                 big: !!opts.big,

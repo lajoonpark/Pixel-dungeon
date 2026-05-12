@@ -376,7 +376,8 @@ const Game = {
         const safeX = Number.isFinite(x) ? x : 0;
         const safeY = Number.isFinite(y) ? y : 0;
         const safeAmount = Number.isFinite(amount) ? amount : 0;
-        const role = opts.role === 'player' ? 'player' : (opts.role === 'enemy' ? 'enemy' : null);
+        let role = null;
+        if (opts.role === 'player' || opts.role === 'enemy') role = opts.role;
         const fallbackColor = role === 'player' ? '#ff4444' : '#ffcc44';
 
         this.damageNumbers.push({
