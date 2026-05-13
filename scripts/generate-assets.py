@@ -942,6 +942,166 @@ def gen_ui_frame():
     d.rectangle([59,59,61,61], fill=(120,100,160,255))
     save(img, 'ui_frame.png')
 
+# ── Corrupted Depths assets ────────────────────────────────────────────────────
+
+def _gen_enemy_blob(name, base_rgb, eye_rgb=(30, 20, 50)):
+    img = new(16, 16)
+    d = draw(img)
+    br, bg, bb = base_rgb
+    d.ellipse([2, 3, 14, 14], fill=(br, bg, bb, 255))
+    d.ellipse([3, 4, 13, 13], fill=(min(255, br + 35), min(255, bg + 25), min(255, bb + 40), 220))
+    d.ellipse([4, 7, 6, 9], fill=eye_rgb + (255,))
+    d.ellipse([10, 7, 12, 9], fill=eye_rgb + (255,))
+    d.rectangle([6, 10, 10, 11], fill=(220, 150, 255, 180))
+    save(scale(img, 3), f'{name}.png')
+
+def _gen_enemy_humanoid(name, body, accent):
+    img = new(16, 16)
+    d = draw(img)
+    d.rectangle([5, 11, 7, 15], fill=body + (255,))
+    d.rectangle([9, 11, 11, 15], fill=body + (255,))
+    d.rectangle([4, 7, 12, 12], fill=body + (255,))
+    d.ellipse([5, 2, 11, 8], fill=(150, 120, 140, 255))
+    d.rectangle([5, 8, 11, 9], fill=accent + (255,))
+    d.rectangle([3, 8, 4, 11], fill=accent + (200,))
+    d.rectangle([12, 8, 13, 11], fill=accent + (200,))
+    d.rectangle([6, 4, 7, 5], fill=(40, 20, 60, 255))
+    d.rectangle([9, 4, 10, 5], fill=(40, 20, 60, 255))
+    save(scale(img, 3), f'{name}.png')
+
+def gen_corrupted_depths_assets():
+    # Enemies
+    _gen_enemy_blob('enemy_corrupted_slime', (110, 50, 170))
+    _gen_enemy_blob('enemy_void_bat', (75, 35, 130), eye_rgb=(220, 90, 255))
+    _gen_enemy_humanoid('enemy_cultist', (70, 40, 95), (170, 90, 220))
+    _gen_enemy_humanoid('enemy_corrupted_archer', (85, 45, 115), (205, 130, 255))
+    _gen_enemy_humanoid('enemy_corrupted_summoner', (78, 32, 105), (188, 92, 248))
+    _gen_enemy_humanoid('enemy_corrupted_minion', (66, 28, 96), (150, 70, 210))
+
+    golem = new(16, 16)
+    d = draw(golem)
+    d.rectangle([4, 6, 12, 15], fill=(130, 105, 170, 255))
+    d.rectangle([3, 7, 13, 15], fill=(110, 90, 150, 255))
+    d.rectangle([5, 2, 11, 7], fill=(140, 120, 190, 255))
+    d.rectangle([2, 8, 4, 13], fill=(125, 98, 170, 255))
+    d.rectangle([12, 8, 14, 13], fill=(125, 98, 170, 255))
+    d.rectangle([6, 4, 7, 5], fill=(245, 230, 255, 255))
+    d.rectangle([9, 4, 10, 5], fill=(245, 230, 255, 255))
+    save(scale(golem, 3), 'enemy_crystal_golem.png')
+
+    hound = new(16, 16)
+    d = draw(hound)
+    d.rectangle([3, 9, 13, 14], fill=(84, 35, 118, 255))
+    d.rectangle([4, 6, 12, 10], fill=(95, 42, 130, 255))
+    d.polygon([(12,6),(15,7),(12,9)], fill=(95, 42, 130, 255))
+    d.polygon([(4,6),(1,7),(4,9)], fill=(95, 42, 130, 255))
+    d.rectangle([5, 4, 7, 5], fill=(235, 120, 255, 255))
+    d.rectangle([9, 4, 11, 5], fill=(235, 120, 255, 255))
+    save(scale(hound, 3), 'enemy_void_hound.png')
+
+    turret = new(16, 16)
+    d = draw(turret)
+    d.rectangle([3, 5, 13, 15], fill=(130, 100, 185, 255))
+    d.rectangle([5, 2, 11, 6], fill=(180, 140, 240, 255))
+    d.ellipse([5, 6, 11, 12], fill=(220, 190, 255, 220))
+    d.rectangle([7, 7, 9, 9], fill=(255, 250, 255, 255))
+    save(scale(turret, 3), 'enemy_crystal_turret.png')
+
+    # Bosses
+    behemoth = new(32, 32)
+    d = draw(behemoth)
+    d.rectangle([6, 12, 26, 30], fill=(110, 80, 160, 255))
+    d.rectangle([4, 14, 28, 30], fill=(95, 70, 145, 255))
+    d.rectangle([8, 4, 24, 14], fill=(125, 95, 175, 255))
+    for sx, sy in [(8,12),(23,12),(6,20),(25,20),(14,7),(18,7)]:
+        d.polygon([(sx, sy), (sx+2, sy-3), (sx+4, sy)], fill=(210, 180, 255, 255))
+    d.rectangle([12, 8, 14, 10], fill=(250, 245, 255, 255))
+    d.rectangle([18, 8, 20, 10], fill=(250, 245, 255, 255))
+    save(scale(behemoth, 4), 'boss_crystal_behemoth.png')
+
+    herald = new(32, 32)
+    d = draw(herald)
+    d.polygon([(8,30),(24,30),(28,14),(4,14)], fill=(65, 20, 95, 255))
+    d.polygon([(7,14),(16,2),(25,14)], fill=(95, 35, 135, 255))
+    d.ellipse([10, 8, 22, 18], fill=(120, 55, 175, 255))
+    d.rectangle([12, 11, 14, 13], fill=(255, 120, 245, 255))
+    d.rectangle([18, 11, 20, 13], fill=(255, 120, 245, 255))
+    d.ellipse([5, 18, 11, 24], fill=(100, 40, 150, 200))
+    d.ellipse([21, 18, 27, 24], fill=(100, 40, 150, 200))
+    save(scale(herald, 4), 'boss_void_herald.png')
+
+    # Tiles
+    tf = new(16, 16); d = draw(tf)
+    d.rectangle([0,0,15,15], fill=(33, 22, 50, 255))
+    d.line([0,7,15,7], fill=(24, 15, 38, 255))
+    d.line([7,0,7,15], fill=(24, 15, 38, 255))
+    d.rectangle([2,2,4,4], fill=(95, 60, 155, 120))
+    d.rectangle([10,10,13,13], fill=(115, 70, 170, 120))
+    save(scale(tf, 4), 'tile_floor_corrupted.png')
+
+    tw = new(16, 16); d = draw(tw)
+    d.rectangle([0,0,15,15], fill=(20, 12, 32, 255))
+    d.rectangle([0,0,7,3], fill=(37, 22, 58, 255))
+    d.rectangle([8,0,15,3], fill=(32, 18, 50, 255))
+    d.rectangle([0,4,15,7], fill=(34, 20, 54, 255))
+    d.rectangle([0,8,15,11], fill=(31, 18, 49, 255))
+    d.rectangle([0,12,15,15], fill=(29, 17, 46, 255))
+    save(scale(tw, 4), 'tile_wall_corrupted.png')
+
+    cp = new(16, 16); d = draw(cp)
+    d.ellipse([1,3,15,13], fill=(115, 45, 185, 190))
+    d.ellipse([3,4,14,12], fill=(145, 65, 215, 165))
+    d.ellipse([5,6,11,10], fill=(220, 130, 255, 120))
+    save(scale(cp, 4), 'tile_corruption_puddle.png')
+
+    rr = new(16, 16); d = draw(rr)
+    d.rectangle([0,0,15,15], fill=(0, 0, 0, 0))
+    d.ellipse([2,2,14,14], outline=(210, 110, 255, 220), width=2)
+    d.line([8,2,8,14], fill=(210, 110, 255, 180), width=1)
+    d.line([2,8,14,8], fill=(210, 110, 255, 180), width=1)
+    save(scale(rr, 4), 'tile_ritual_rune.png')
+
+    cw = new(16, 16); d = draw(cw)
+    d.rectangle([0,0,15,15], fill=(32, 20, 46, 255))
+    d.polygon([(3,13),(7,2),(11,13)], fill=(170, 125, 245, 255))
+    d.polygon([(8,14),(12,4),(15,14)], fill=(140, 100, 225, 230))
+    d.polygon([(0,14),(4,5),(8,14)], fill=(140, 100, 225, 230))
+    save(scale(cw, 4), 'tile_crystal_wall.png')
+
+    # Effects
+    eff = new(16, 16); d = draw(eff)
+    d.ellipse([2,2,14,14], fill=(140, 60, 220, 170))
+    d.ellipse([4,4,12,12], fill=(185, 90, 250, 140))
+    d.ellipse([6,6,10,10], fill=(235, 160, 255, 180))
+    save(scale(eff, 3), 'effect_corruption.png')
+
+    # Dungeon/room UI icons
+    def room_icon(name, rgb):
+        img = new(24, 24)
+        d = draw(img)
+        d.rectangle([1,1,22,22], fill=(20, 14, 30, 255), outline=rgb + (255,), width=1)
+        d.ellipse([5,5,18,18], fill=rgb + (190,))
+        d.rectangle([9,9,14,14], fill=(230, 210, 255, 210))
+        save(scale(img, 2), f'{name}.png')
+
+    room_icon('icon_dungeon_crypt', (110, 92, 145))
+    room_icon('icon_dungeon_corrupted', (150, 70, 220))
+    room_icon('icon_room_corrupted_combat', (130, 55, 191))
+    room_icon('icon_room_ritual_chamber', (192, 96, 255))
+    room_icon('icon_room_crystal_cavern', (166, 133, 255))
+    room_icon('icon_room_corrupted_maze', (112, 67, 161))
+    room_icon('icon_room_elite_hunt', (205, 90, 111))
+    room_icon('icon_room_treasure_vault', (211, 166, 73))
+    room_icon('icon_room_corruption_flood', (141, 55, 209))
+    room_icon('icon_room_void_shrine', (98, 118, 199))
+
+    bar = new(128, 24)
+    d = draw(bar)
+    d.rectangle([0,0,127,23], fill=(18, 10, 28, 220))
+    d.rectangle([1,1,126,22], outline=(180, 90, 255, 255), width=2)
+    d.rectangle([4,8,123,16], fill=(155, 70, 230, 180))
+    save(bar, 'ui_boss_bar_corrupted.png')
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
@@ -1011,6 +1171,7 @@ if __name__ == '__main__':
     gen_particle_spark()
     gen_heal_effect()
     gen_ui_frame()
+    gen_corrupted_depths_assets()
 
     print("\n[Class system assets]")
     gen_class_assets()

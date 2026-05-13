@@ -16,13 +16,61 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 | **Class Roll System** | Spend crystals to roll random classes; duplicates convert to bonus crystals |
 | **Auto-attack** | Fires homing projectiles at the nearest enemy automatically |
 | **2-5 Abilities per class** | Up to 5 keyed abilities (J K L U I); each class has its own dash |
-| **7 Enemy Types + Boss** | Slime, Bat, Skeleton, Spider, Bomber, Healer, Summoner, Necromancer |
-| **10 Rooms** | 3 dungeon themes (Crypt to Forest to Lava), rest room at room 5, boss room at room 10 |
+| **15+ Enemy Types + Multi-Boss** | Base dungeon enemies + Corrupted Depths enemy roster (Corrupted Slime, Void Bat, Cultist, Crystal Golem, Corrupted Archer, Void Hound, Crystal Turret, Corrupted Summoner) |
+| **2 Dungeons** | Dungeon 1: 10 rooms, Necromancer final boss · Dungeon 2: 20 rooms, Crystal Behemoth mini boss (room 10), Void Herald final boss (room 20) |
 | **Level-up System** | Choose 1 of 3 random run upgrades on level-up |
 | **Permanent Shop** | Spend crystals between runs for lasting upgrades |
 | **Status Effects** | Burn, Freeze, Poison, Shock, Bleed, Slow |
 | **Mobile Support** | On-screen joystick + touch buttons |
 | **Persistent Save** | Crystals, best run, permanent upgrades, unlocked classes in localStorage |
+
+## Dungeon Select & Progression
+
+- Flow: **Main Menu → Start Run → Dungeon Select → Class Select**
+- **Dungeon 1 (Forgotten Catacombs)** is unlocked by default.
+- **Dungeon 2 (The Corrupted Depths)** unlocks permanently after your first Dungeon 1 clear.
+- Unlocks are saved in localStorage via `SaveSystem` (`unlockedDungeons`, `selectedDungeon`, `dungeonClears`).
+
+### Dungeon 2: The Corrupted Depths
+
+- **Theme:** cursed stone, purple crystal growths, ritual runes, void corruption.
+- **Structure:** 20 rooms total.
+  - Rooms 1–5: intro corrupted enemies + hazards
+  - Rooms 6–9: higher elite chance + trap pressure
+  - **Room 10:** mini boss (**The Crystal Behemoth**)
+  - Rooms 11–15: stronger mixed waves + elite pressure
+  - Rooms 16–19: hardest standard rooms + dense hazards
+  - **Room 20:** final boss (**The Void Herald**)
+- **Difficulty/Rewards:** higher XP/coin/crystal gains, more elite enemies, stronger enemy scaling, better class synergy opportunities from denser mixed encounters.
+
+### Dungeon 2 Room Types
+
+- Corrupted Combat Room
+- Ritual Chamber (delayed reinforcements)
+- Crystal Cavern
+- Corrupted Maze Room
+- Elite Hunt Room
+- Treasure Vault
+- Corruption Flood Room (spreading hazard zones)
+- Void Shrine
+
+### Dungeon 2 Enemy List
+
+- Corrupted Slime (can split into slimelets)
+- Void Bat (high-speed dash style)
+- Cultist (ranged dark bolts + minion summon)
+- Crystal Golem (tank with vulnerable window)
+- Corrupted Archer (long-range volleys + retreat)
+- Void Hound (aggressive lunges, enrages at low HP)
+- Crystal Turret (stationary beam pressure)
+- Corrupted Summoner (summons and buffs nearby enemies)
+
+### Bosses
+
+- **Mini boss (Room 10):** The Crystal Behemoth  
+  Crystal slam, radial crystal barrage, charge bursts, crystal summons, phase 2 speed-up and corruption pressure.
+- **Final boss (Room 20):** The Void Herald  
+  Teleport + projectile patterns (P1), rotating beam patterns + hazard pulses (P2), rapid attacks + high arena pressure (P3).
 
 ## Class System
 
@@ -64,8 +112,10 @@ Only **Human Adventurer** is unlocked at the start. All others must be obtained 
 
 ## Crystal Rewards
 
-- Clearing any room grants **+1 crystal** immediately.
+- Dungeon 1 room clear: **+1 crystal**.
+- Dungeon 2 room clear: **+2 crystals**.
 - **Crystal Finder** grants **+10% chance per level** to gain **+1 bonus crystal** on room clear (capped at 100%).
+- Dungeon 2 mini/final boss runs and higher-tier encounters produce higher total crystal income through stronger reward multipliers and guaranteed boss crystal payouts.
 - Room-clear crystals are saved to localStorage immediately.
 
 ## Controls
@@ -88,20 +138,20 @@ Only **Human Adventurer** is unlocked at the start. All others must be obtained 
 index.html                   <- Entry point
 js/
   saveSystem.js              <- localStorage persistence (includes class unlock state)
-  assets.js                  <- Image preloader with canvas fallbacks (142 assets)
+  assets.js                  <- Image preloader with canvas fallbacks (expanded generated asset set)
   statusEffects.js           <- Burn / Freeze / Poison / Shock / Bleed / Slow
   upgrades.js                <- 20 run upgrades + 5 permanent upgrades
   projectiles.js             <- Projectile + Particle + spawnExplosion
   abilities.js               <- 43 ability classes + ABILITY_REGISTRY
   classes.js                 <- CLASS_DEFS (12 classes), ClassSystem API, RARITY_COLORS
-  enemies.js                 <- 8 enemy types + Necromancer boss
+  enemies.js                 <- Enemy roster + elite modifiers + dungeon bosses
   player.js                  <- Player class (data-driven from ClassSystem)
   rooms.js                   <- Room generation + 3 dungeon themes
   ui.js                      <- All menus, HUD, class collection, roll screen
   game.js                    <- Main game loop + state machine
 scripts/
-  generate-assets.py         <- Generates all 142 sprites via Pillow
-public/generated-assets/     <- 142 PNG pixel-art sprites (auto-generated)
+  generate-assets.py         <- Generates all sprites via Pillow
+ public/generated-assets/     <- auto-generated PNG pixel-art sprites
 ```
 
 ## Regenerating Assets
@@ -120,6 +170,12 @@ This regenerates:
 - 12 passive icons (passive_adventurer.png ... passive_chronomancer.png)
 - 5 rarity frames (frame_common.png ... frame_mythic.png)
 - All original enemy, tile, upgrade, and UI assets
+- **Corrupted Depths assets generated with Pillow**:
+  - corrupted floor/wall tiles, ritual runes, corruption puddles, crystal hazard walls
+  - Dungeon 2 enemy sprites + mini/final boss sprites
+  - corruption effect sprite
+  - dungeon select + room-type UI icons
+  - corrupted boss-bar frame asset
 
 Assets are saved to `public/generated-assets/`.
 
@@ -150,6 +206,7 @@ LOADING -> MENU -> CLASS_SELECT -> CLASS_COLLECTION
        GAMEOVER <-----------> VICTORY -> SHOP
 ```
 
-Rooms 0-3 and 5-8 are combat rooms (scales +18% per room). Room 4 and 8 are rest/treasure rooms. Room 9 is the Necromancer boss fight.
+Dungeon 1 uses 10 rooms with a final boss in room 10.  
+Dungeon 2 uses 20 rooms with a mini boss in room 10 and final boss in room 20.
 
 Killing the boss still grants separate victory rewards; room-clear crystals are awarded and saved immediately during the run.

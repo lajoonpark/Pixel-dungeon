@@ -221,6 +221,18 @@ class Player {
                 if (this._spikeTimer > 0.5) { this._spikeTimer = 0; this.takeDamage(8, game); }
             } else if (tileType === TILE.POISON) {
                 this.applyEffect('poison');
+            } else if (tileType === TILE.CORRUPTION) {
+                if (!this._corruptionTimer) this._corruptionTimer = 0;
+                this._corruptionTimer += dt;
+                if (this._corruptionTimer > 0.35) { this._corruptionTimer = 0; this.takeDamage(6, game); }
+                this.applyEffect('slow');
+            } else if (tileType === TILE.RUNE) {
+                this.applyEffect('slow');
+            } else if (tileType === TILE.CRYSTAL) {
+                this.applyEffect('slow');
+                if (!this._crystalTick) this._crystalTick = 0;
+                this._crystalTick += dt;
+                if (this._crystalTick > 0.7) { this._crystalTick = 0; this.takeDamage(4, game); }
             }
         }
 
