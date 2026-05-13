@@ -84,6 +84,7 @@ const SaveSystem = {
         }
         const ownedSet = new Set(save.ownedCardIds.map(String));
         save.ownedCardIds = [...ownedSet];
+        if (!Array.isArray(save.equippedCardIds)) save.equippedCardIds = [];
         save.equippedCardIds = save.equippedCardIds.map(String).filter(id => ownedSet.has(id));
         if (save.equippedCardIds.length === 0) {
             save.equippedCardIds = [...SAVE_STARTING_OWNED_CARD_IDS].filter(id => ownedSet.has(id));

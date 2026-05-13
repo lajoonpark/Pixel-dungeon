@@ -1,6 +1,12 @@
 'use strict';
 
 const PLAYER_MAX_DODGE_CHANCE = 0.5;
+const SPIKE_DAMAGE = 8;
+const SPIKE_TICK_INTERVAL = 0.5;
+const CORRUPTION_DAMAGE = 6;
+const CORRUPTION_TICK_INTERVAL = 0.35;
+const CRYSTAL_DAMAGE = 4;
+const CRYSTAL_TICK_INTERVAL = 0.7;
 
 class Player {
     constructor(classId) {
@@ -45,6 +51,7 @@ class Player {
         this.tempDodgeBonus = 0;
         this.tempDodgeUntil = 0;
         this.battleRhythmUntil = 0;
+        this.battleRhythmActive = false;
         this.stormOfBladesChance = 0;
 
         // Auto-attack state
@@ -265,13 +272,13 @@ class Player {
             if (tileType === TILE.SPIKE) {
                 if (!this._spikeTimer) this._spikeTimer = 0;
                 this._spikeTimer += dt;
-                if (this._spikeTimer > 0.5) { this._spikeTimer = 0; this.takeDamage(8, { sourceType: 'hazard', isHazard: true }, game); }
+                if (this._spikeTimer > SPIKE_TICK_INTERVAL) { this._spikeTimer = 0; this.takeDamage(SPIKE_DAMAGE, { sourceType: 'hazard', isHazard: true }, game); }
             } else if (tileType === TILE.POISON) {
                 this.applyEffect('poison');
             } else if (tileType === TILE.CORRUPTION) {
                 if (!this._corruptionTimer) this._corruptionTimer = 0;
                 this._corruptionTimer += dt;
-                if (this._corruptionTimer > 0.35) { this._corruptionTimer = 0; this.takeDamage(6, { sourceType: 'hazard', isHazard: true }, game); }
+                if (this._corruptionTimer > CORRUPTION_TICK_INTERVAL) { this._corruptionTimer = 0; this.takeDamage(CORRUPTION_DAMAGE, { sourceType: 'hazard', isHazard: true }, game); }
                 this.applyEffect('slow');
             } else if (tileType === TILE.RUNE) {
                 this.applyEffect('slow');
@@ -279,7 +286,7 @@ class Player {
                 this.applyEffect('slow');
                 if (!this._crystalTick) this._crystalTick = 0;
                 this._crystalTick += dt;
-                if (this._crystalTick > 0.7) { this._crystalTick = 0; this.takeDamage(4, { sourceType: 'hazard', isHazard: true }, game); }
+                if (this._crystalTick > CRYSTAL_TICK_INTERVAL) { this._crystalTick = 0; this.takeDamage(CRYSTAL_DAMAGE, { sourceType: 'hazard', isHazard: true }, game); }
             }
         }
 

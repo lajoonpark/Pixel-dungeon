@@ -1,5 +1,5 @@
 'use strict';
-const CARD_RARITY_SHOP_WEIGHTS = { common: 55, rare: 25, epic: 13, legendary: 5, mythic: 2 };
+const CARD_SHOP_RARITY_WEIGHTS = { common: 55, rare: 25, epic: 13, legendary: 5, mythic: 2 };
 const CARD_SHOP_COSTS = { common: 50, rare: 120, epic: 300, legendary: 750, mythic: 1500 };
 
 const STARTING_OWNED_CARD_IDS = [
@@ -158,7 +158,8 @@ const UPGRADES = [
     { id:'unstablePower', name:'Unstable Power', desc:'+35% ability damage, but abilities cost 2% current HP.', rarity:'legendary', tags:['ability','risk'], icon:'card_unstable_power', type:'generic',
         apply(p){ p.abilityDmgMult = (p.abilityDmgMult || 1) * 1.35; },
         onAbilityCast(player) {
-            const hpCost = Math.max(1, player.hp * 0.02);
+            if (player.hp <= 1) return;
+            const hpCost = Math.max(player.hp * 0.02, 0.25);
             player.hp = Math.max(1, player.hp - hpCost);
         }
     },
@@ -458,10 +459,10 @@ const UpgradeSystem = {
 
     _weightedCardChoice(cards) {
         if (!cards || cards.length === 0) return null;
-        const totalWeight = cards.reduce((sum, c) => sum + (CARD_RARITY_SHOP_WEIGHTS[c.rarity] || 1), 0);
+        const totalWeight = cards.reduce((sum, c) => sum + (CARD_SHOP_RARITY_WEIGHTS[c.rarity] || 1), 0);
         let roll = Math.random() * totalWeight;
         for (const card of cards) {
-            roll -= (CARD_RARITY_SHOP_WEIGHTS[card.rarity] || 1);
+            roll -= (CARD_SHOP_RARITY_WEIGHTS[card.rarity] || 1);
             if (roll <= 0) return card;
         }
         return cards[cards.length - 1];

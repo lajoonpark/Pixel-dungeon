@@ -63,6 +63,9 @@ const DUNGEON_DEFS = {
 };
 const DEFAULT_ABILITY_KEY_COUNT = 2;
 const ABILITY_HINT_KEYS = ['J', 'K', 'L', 'U', 'I'];
+const ELITE_COIN_BONUS = 4;
+const MINIBOSS_COIN_BONUS = 20;
+const BOSS_COIN_BONUS = 35;
 
 const Game = {
     state: STATES.LOADING,
@@ -797,19 +800,19 @@ const Game = {
         const originalCooldown = ability.cooldown;
         let castMult = Number.isFinite(options.damageMult) ? options.damageMult : 1;
 
+        let usedManaBattery = false;
         if (!options.isRepeat && p.manaBatteryBonus && now <= (p.manaBatteryUntil || 0)) {
             const abilityId = ability.abilityId || ability.name || ability.key;
             if (abilityId !== p.manaBatterySourceAbilityId) {
                 castMult *= p.manaBatteryBonus;
-                p.manaBatteryBonus = 1;
-                p.manaBatteryUntil = 0;
-                p.manaBatterySourceAbilityId = null;
+                usedManaBattery = true;
             }
         }
 
-        if (!options.isRepeat && p.overchargeCount >= 0) {
-            p.overchargeCount = (p.overchargeCount || 0) + 1;
-            if (p.overchargeCount % 3 === 0) castMult *= 1.5;
+        let shouldIncrementOvercharge = false;
+        if (!options.isRepeat && p.overchargeCount != null) {
+            shouldIncrementOvercharge = true;
+            if (((p.overchargeCount || 0) + 1) % 3 === 0) castMult *= 1.5;
         }
 
         p.abilityDmgMult = originalAbilityDmgMult * castMult;
@@ -819,6 +822,13 @@ const Game = {
         p.abilityDmgMult = originalAbilityDmgMult;
         p.atkMult = originalAtkMult;
         if (options.freeCast) ability.cooldown = originalCooldown;
+
+        if (used && usedManaBattery) {
+            p.manaBatteryBonus = 1;
+            p.manaBatteryUntil = 0;
+            p.manaBatterySourceAbilityId = null;
+        }
+        if (used && shouldIncrementOvercharge) p.overchargeCount = (p.overchargeCount || 0) + 1;
 
         if (used && !options.skipHooks) {
             this.triggerCardHook('onAbilityCast', {
@@ -933,13 +943,14 @@ const Game = {
         const preset = this._selectedPreset();
         if (!preset) return;
         const nextName = window.prompt('Preset name', preset.name || 'Preset');
-        if (!nextName) return;
+        if (nextName == null) return;
         preset.name = nextName.trim() || preset.name;
         SaveSystem.save(this.saveData);
     },
 
     createCardPreset() {
-        const name = window.prompt('New preset name', `Preset ${((this.saveData.cardPresets || []).length + 1)}`) || '';
+        const name = window.prompt('New preset name', `Preset ${((this.saveData.cardPresets || []).length + 1)}`);
+        if (name == null) return;
         const id = `preset_${Date.now()}`;
         this.saveData.cardPresets = this.saveData.cardPresets || [];
         this.saveData.cardPresets.push({ id, name: name.trim() || 'Preset', equippedCardIds: [...new Set(this.saveData.equippedCardIds || [])] });
@@ -1111,7 +1122,7 @@ const Game = {
                     if (e.dead) continue;
                     if (pr.distanceTo(e.x, e.y) < e.size + pr.size * 0.5) {
                         const dmg = pr.damage;
-                        e.takeDamage(dmg, 'physical', this, { sourcePlayer: this.player, projectile: pr, isAbilityDamage: !!pr.isAbilityProjectile });
+                        e.takeDamage(dmg, 'physical', this, { sourcePlayer: this.player, projectile: pr, isAbilityDamage: !pr.isBasicAttack });
                         if (pr.onHit) pr.onHit(e, this);
                         // Knockback
                         e.knockback(pr.x - pr._vx*dt*2, pr.y - pr._vy*dt*2, 80);
@@ -1138,9 +1149,9 @@ const Game = {
                             const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
                             p.gainXp(Math.floor((e.xpReward || 0) * (dungeon.xpMultiplier || 1)), this);
                             let coinAmount = Math.floor((e.coinReward || 0) * (dungeon.coinMultiplier || 1));
-                            if (e.isElite) coinAmount += 4;
-                            if (e.isMiniBoss) coinAmount += 20;
-                            if (e.isBoss) coinAmount += 35;
+                            if (e.isElite) coinAmount += ELITE_COIN_BONUS;
+                            if (e.isMiniBoss) coinAmount += MINIBOSS_COIN_BONUS;
+                            if (e.isBoss) coinAmount += BOSS_COIN_BONUS;
                             this.addCoins(coinAmount, `enemy_kill_${e.type}`);
                             this.triggerCardHook('onEnemyKilled', { enemy: e });
                             // Crystal drop

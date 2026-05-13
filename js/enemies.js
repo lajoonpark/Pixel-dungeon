@@ -100,7 +100,7 @@ class Enemy {
             if ((sourcePlayer.bossDamageMult || 1) > 1 && (this.isElite || this.isMiniBoss || this.isBoss)) {
                 amount *= sourcePlayer.bossDamageMult;
             }
-            if ((sourcePlayer.huntersMarkEnabled || false) && (this.markedUntil || 0) > ((game && game.runClock) || 0) && !opts.projectile?.isBasicAttack) {
+            if ((sourcePlayer.huntersMarkEnabled || false) && (this.markedUntil || 0) > ((game && game.runClock) || 0) && (opts.isAbilityDamage || (opts.projectile && !opts.projectile.isBasicAttack))) {
                 amount *= 1.15;
             }
         }
