@@ -901,6 +901,71 @@ def gen_upgrade_icons():
         draw_fn(d)
         save(img, f'{name}.png')
 
+def gen_permanent_tree_icons():
+    def card(name, draw_fn):
+        img = new(20, 20)
+        d = draw(img)
+        draw_fn(d)
+        save(img, f'{name}.png')
+
+    card('upgrade_fortified_body', lambda d: [
+        d.polygon([(10,2),(16,5),(16,12),(10,18),(4,12),(4,5)], fill=(120,170,255,255)),
+        d.polygon([(10,4),(14,6),(14,11),(10,15),(6,11),(6,6)], fill=(180,215,255,220)),
+    ])
+    card('upgrade_iron_skin', lambda d: [
+        d.rectangle([4,4,16,16], fill=(130,140,165,255)),
+        d.rectangle([6,6,14,14], fill=(170,180,205,230)),
+        d.line([4,8,16,8], fill=(95,105,130,255), width=1),
+        d.line([4,12,16,12], fill=(95,105,130,255), width=1),
+    ])
+    card('upgrade_fleet_footed', lambda d: [
+        d.polygon([(3,12),(8,6),(14,6),(12,10),(17,10),(12,16),(6,16)], fill=(90,200,255,255)),
+        d.line([2,9,6,7], fill=(170,230,255,200), width=1),
+        d.line([2,13,6,11], fill=(170,230,255,200), width=1),
+    ])
+    card('upgrade_evasion_training', lambda d: [
+        d.ellipse([3,7,17,16], outline=(120,255,190,255), width=2),
+        d.ellipse([8,10,12,14], fill=(120,255,190,255)),
+        d.line([4,4,8,8], fill=(180,255,220,220), width=1),
+        d.line([16,4,12,8], fill=(180,255,220,220), width=1),
+    ])
+
+    card('upgrade_combat_training', lambda d: [
+        d.polygon([(9,2),(11,2),(13,9),(10,17),(7,9)], fill=(255,120,90,255)),
+        d.rectangle([8,14,12,18], fill=(170,80,65,255)),
+    ])
+    card('upgrade_arcane_mastery', lambda d: [
+        d.ellipse([3,3,17,17], fill=(150,90,255,220)),
+        d.polygon([(10,4),(12,8),(16,10),(12,12),(10,16),(8,12),(4,10),(8,8)], fill=(210,170,255,220)),
+        d.ellipse([8,8,12,12], fill=(245,225,255,255)),
+    ])
+    card('upgrade_rapid_strikes', lambda d: [
+        d.polygon([(4,15),(8,5),(11,6),(7,16)], fill=(255,210,90,255)),
+        d.polygon([(9,14),(13,4),(16,5),(12,15)], fill=(255,180,70,230)),
+    ])
+
+    card('upgrade_fortune', lambda d: [
+        d.polygon([(10,2),(12,7),(18,7),(13,11),(15,18),(10,14),(5,18),(7,11),(2,7),(8,7)], fill=(120,220,90,255)),
+        d.ellipse([8,8,12,12], fill=(200,255,160,220)),
+    ])
+    card('upgrade_crystal_hoarder', lambda d: [
+        d.polygon([(4,16),(7,7),(10,16)], fill=(150,95,230,255)),
+        d.polygon([(8,16),(11,5),(14,16)], fill=(190,130,255,255)),
+        d.polygon([(12,16),(15,8),(18,16)], fill=(165,110,245,235)),
+    ])
+
+    def category_icon(name, base, core):
+        img = new(24, 24)
+        d = draw(img)
+        d.rectangle([1,1,22,22], fill=(20,15,30,255), outline=base + (255,), width=1)
+        d.ellipse([4,4,19,19], fill=base + (180,))
+        d.ellipse([8,8,15,15], fill=core + (230,))
+        save(scale(img, 2), f'{name}.png')
+
+    category_icon('category_defense', (100, 145, 230), (185, 215, 255))
+    category_icon('category_offense', (230, 125, 95), (255, 210, 170))
+    category_icon('category_utility', (130, 190, 95), (210, 245, 175))
+
 # ── XP gem ────────────────────────────────────────────────────────────────────
 
 def gen_xp_gem():
@@ -1165,6 +1230,7 @@ if __name__ == '__main__':
 
     print("\n[Upgrade icons]")
     gen_upgrade_icons()
+    gen_permanent_tree_icons()
 
     print("\n[Misc]")
     gen_xp_gem()

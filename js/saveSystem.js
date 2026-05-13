@@ -25,6 +25,7 @@ const SaveSystem = {
             const save = !raw
                 ? this._deep(this.defaultSave)
                 : Object.assign(this._deep(this.defaultSave), JSON.parse(raw));
+            this._migrateSave(save);
             if (!Array.isArray(save.unlockedDungeons)) save.unlockedDungeons = ['dungeon1'];
             if (!save.unlockedDungeons.includes('dungeon1')) save.unlockedDungeons.push('dungeon1');
             if (!save.selectedDungeon) save.selectedDungeon = 'dungeon1';
@@ -41,6 +42,23 @@ const SaveSystem = {
     reset() {
         localStorage.removeItem(this.KEY);
         return this._deep(this.defaultSave);
+    },
+
+    _migrateSave(save) {
+        if (!save || typeof save !== 'object') return;
+        if (!save.permanentUpgrades || typeof save.permanentUpgrades !== 'object') {
+            save.permanentUpgrades = {};
+        }
+
+        // Crystal Finder -> Crystal Hoarder migration
+        const legacyKeys = ['crystalFinder', 'p_crystal_finder'];
+        let migrated = save.permanentUpgrades.p_crystal || 0;
+        for (const key of legacyKeys) {
+            const legacyRank = save.permanentUpgrades[key];
+            if (Number.isFinite(legacyRank) && legacyRank > migrated) migrated = legacyRank;
+            if (key in save.permanentUpgrades) delete save.permanentUpgrades[key];
+        }
+        save.permanentUpgrades.p_crystal = Math.max(0, Math.min(5, migrated | 0));
     },
 
     _deep(obj) { return JSON.parse(JSON.stringify(obj)); }

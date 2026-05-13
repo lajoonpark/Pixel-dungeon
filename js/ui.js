@@ -562,7 +562,7 @@ const UI = {
         ctx.textAlign = 'left';
     },
 
-    renderClassRoll(ctx, saveData, animActive, animPhase, animResult, animTimer) {
+    renderClassRoll(ctx, saveData, animActive, animPhase, animResult, animTimer, fortuneRank) {
         ctx.fillStyle = '#0a0810';
         ctx.fillRect(0, 0, 800, 600);
 
@@ -583,12 +583,15 @@ const UI = {
         ctx.fillText(`💎 ${crystals} crystals`, 400, 118);
 
         // Rarity odds display
+        const weights = (typeof ClassSystem !== 'undefined' && typeof ClassSystem.getRarityWeights === 'function')
+            ? ClassSystem.getRarityWeights(fortuneRank || 0)
+            : { common: 60, rare: 25, epic: 10, legendary: 4, mythic: 1 };
         const rarities = [
-            { r:'common',    pct:'60%', color:'#888888' },
-            { r:'rare',      pct:'25%', color:'#4488ff' },
-            { r:'epic',      pct:'10%', color:'#aa44cc' },
-            { r:'legendary', pct:'4%',  color:'#ffaa00' },
-            { r:'mythic',    pct:'1%',  color:'#cc2222' },
+            { r:'common',    pct:`${weights.common.toFixed(1)}%`, color:'#888888' },
+            { r:'rare',      pct:`${weights.rare.toFixed(1)}%`, color:'#4488ff' },
+            { r:'epic',      pct:`${weights.epic.toFixed(1)}%`, color:'#aa44cc' },
+            { r:'legendary', pct:`${weights.legendary.toFixed(1)}%`, color:'#ffaa00' },
+            { r:'mythic',    pct:`${weights.mythic.toFixed(1)}%`, color:'#cc2222' },
         ];
         ctx.font = '12px monospace';
         rarities.forEach((r, i) => {
@@ -598,6 +601,8 @@ const UI = {
             ctx.fillStyle = '#cccccc';
             ctx.fillText(r.pct, x, 165);
         });
+        ctx.fillStyle = '#9f8abf';
+        ctx.fillText(`Fortune rank: ${fortuneRank || 0}`, 400, 176);
 
         // Cost ladder display
         ctx.fillStyle = '#887799'; ctx.font = '11px monospace';
@@ -796,7 +801,7 @@ const UI = {
         ctx.textAlign = 'left';
     },
 
-    renderShop(ctx, saveData, hoverUpg) {
+    renderShop(ctx, saveData, hoverUpg, selectedCategory, hoverTab) {
         ctx.fillStyle = '#0c0a14';
         ctx.fillRect(0, 0, 800, 600);
 
@@ -807,7 +812,7 @@ const UI = {
 
         ctx.fillStyle = '#887766';
         ctx.font = '14px monospace';
-        ctx.fillText('"Spend crystals to permanently boost your runs!"', 130, 75);
+        ctx.fillText('"Defense • Offense • Utility"', 130, 75);
 
         // Crystal balance
         Assets.draw(ctx, 'icon_crystal', 680, 10, 20, 20);
@@ -815,12 +820,46 @@ const UI = {
         ctx.font = 'bold 18px monospace';
         ctx.fillText(`${saveData.crystals} crystals`, 704, 27);
 
-        const perRow = 3;
-        PERMANENT_UPGRADES.forEach((pu, i) => {
-            const col = i % perRow;
-            const row = Math.floor(i / perRow);
-            const x = 130 + col * 220;
-            const y = 100 + row * 160;
+        const categories = (typeof UpgradeSystem !== 'undefined' && typeof UpgradeSystem.getPermanentCategories === 'function')
+            ? UpgradeSystem.getPermanentCategories()
+            : ['defense', 'offense', 'utility'];
+        const activeCategory = selectedCategory || 'defense';
+        const activeList = (typeof UpgradeSystem !== 'undefined' && typeof UpgradeSystem.getPermanentUpgradesByCategory === 'function')
+            ? UpgradeSystem.getPermanentUpgradesByCategory(activeCategory)
+            : [];
+        const categoryIcons = {
+            defense: 'category_defense',
+            offense: 'category_offense',
+            utility: 'category_utility'
+        };
+
+        categories.forEach((category, idx) => {
+            const x = 130 + idx * 175;
+            const y = 98;
+            const w = 160;
+            const h = 34;
+            const isSelected = category === activeCategory;
+            const isHover = hoverTab === category;
+            ctx.fillStyle = isSelected ? '#3a2b58' : (isHover ? '#2a2239' : '#1b1727');
+            ctx.strokeStyle = isSelected ? '#cda7ff' : '#5f4f77';
+            ctx.lineWidth = isSelected ? 2.5 : 1.5;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 8);
+            ctx.fill();
+            ctx.stroke();
+            Assets.draw(ctx, categoryIcons[category], x + 8, y + 7, 20, 20);
+            ctx.fillStyle = isSelected ? '#efe0ff' : '#b8a6d3';
+            ctx.font = 'bold 13px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(category.toUpperCase(), x + w / 2 + 10, y + 23);
+        });
+        ctx.textAlign = 'left';
+
+        activeList.forEach((pu, i) => {
+            const col = i % 2;
+            const row = Math.floor(i / 2);
+            const x = 130 + col * 270;
+            const y = 150 + row * 190;
             const rank = saveData.permanentUpgrades[pu.id] || 0;
             const cost = UpgradeSystem.permanentCost(pu, rank);
             const isHover = hoverUpg === i;
@@ -831,7 +870,7 @@ const UI = {
             ctx.strokeStyle = isHover ? '#9966cc' : '#443355';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.roundRect(x, y, 200, 140, 8);
+            ctx.roundRect(x, y, 250, 170, 8);
             ctx.fill(); ctx.stroke();
 
             Assets.draw(ctx, pu.icon, x + 8, y + 8, 32, 32);
@@ -839,17 +878,34 @@ const UI = {
             ctx.fillStyle = '#ddccff';
             ctx.font = 'bold 13px monospace';
             ctx.fillText(pu.name, x + 48, y + 22);
+            ctx.fillStyle = '#aa99cc';
+            ctx.font = '11px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(`Rank ${rank}/${pu.maxRank}`, x + 238, y + 22);
+            ctx.textAlign = 'left';
 
             ctx.fillStyle = '#9988aa';
             ctx.font = '11px monospace';
-            ctx.fillText(pu.desc, x + 8, y + 55);
+            ctx.fillText(pu.description || pu.desc, x + 8, y + 55);
+            ctx.fillStyle = '#99b6ff';
+            ctx.fillText(`Effect: ${pu.effectPerRank || ''}`, x + 8, y + 73);
 
             // Rank stars
             for (let r = 0; r < pu.maxRank; r++) {
                 ctx.fillStyle = r < rank ? '#ffcc44' : '#333344';
                 ctx.beginPath();
-                ctx.arc(x + 14 + r * 20, y + 80, 7, 0, Math.PI*2);
+                ctx.arc(x + 14 + r * 20, y + 95, 7, 0, Math.PI*2);
                 ctx.fill();
+            }
+
+            ctx.fillStyle = '#ccb9e6';
+            ctx.font = '10px monospace';
+            if (maxed) {
+                ctx.fillText('Next: MAXED', x + 8, y + 118);
+            } else if (typeof pu.nextRankPreview === 'function') {
+                ctx.fillText(`Next: ${pu.nextRankPreview(rank)}`, x + 8, y + 118);
+            } else {
+                ctx.fillText('Next: +1 rank', x + 8, y + 118);
             }
 
             // Buy button
@@ -857,17 +913,17 @@ const UI = {
                 ctx.fillStyle = canAfford ? (isHover ? '#5522aa' : '#331188') : '#331122';
                 ctx.strokeStyle = canAfford ? '#8844ff' : '#442233';
                 ctx.beginPath();
-                ctx.roundRect(x + 50, y + 100, 100, 28, 6);
+                ctx.roundRect(x + 75, y + 130, 100, 28, 6);
                 ctx.fill(); ctx.stroke();
                 ctx.fillStyle = canAfford ? '#ffffff' : '#885566';
                 ctx.font = 'bold 12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(`Buy (${cost} crystals)`, x + 100, y + 119);
+                ctx.fillText(`Buy (${cost})`, x + 125, y + 149);
                 ctx.textAlign = 'left';
             } else {
                 ctx.fillStyle = '#448844';
                 ctx.font = 'bold 12px monospace';
-                ctx.fillText('✓ MAXED', x + 68, y + 115);
+                ctx.fillText('✓ MAXED', x + 98, y + 149);
             }
         });
 
