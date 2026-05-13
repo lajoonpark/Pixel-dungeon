@@ -3,6 +3,7 @@
 const STATES = {
     LOADING:           'loading',
     MENU:              'menu',
+    DUNGEON_SELECT:    'dungeon_select',
     CLASS_SELECT:      'class_select',
     CLASS_COLLECTION:  'class_collection',
     CLASS_ROLL:        'class_roll',
@@ -16,7 +17,42 @@ const STATES = {
     SETTINGS:          'settings',
 };
 
-const TOTAL_ROOMS = 10;
+const DUNGEON_DEFS = {
+    dungeon1: {
+        id: 'dungeon1',
+        name: 'Forgotten Catacombs',
+        difficulty: 'Normal',
+        totalRooms: 10,
+        miniBossRoom: null,
+        finalBossRoom: 10,
+        rewardLabel: '+1 crystal / room',
+        crystalPerRoom: 1,
+        enemyScalePerRoom: 0.18,
+        eliteBias: 1,
+        coinMultiplier: 1,
+        xpMultiplier: 1,
+        crystalDropBonus: 0,
+        roomBosses: { 10: 'boss_necromancer' },
+        treasureRooms: [5, 9]
+    },
+    dungeon2: {
+        id: 'dungeon2',
+        name: 'The Corrupted Depths',
+        difficulty: 'Hard',
+        totalRooms: 20,
+        miniBossRoom: 10,
+        finalBossRoom: 20,
+        rewardLabel: '+2 crystals / room',
+        crystalPerRoom: 2,
+        enemyScalePerRoom: 0.2,
+        eliteBias: 1.25,
+        coinMultiplier: 1.35,
+        xpMultiplier: 1.4,
+        crystalDropBonus: 0.06,
+        roomBosses: { 10: 'boss_crystal_behemoth', 20: 'boss_void_herald' },
+        treasureRooms: [5, 15]
+    }
+};
 const DEFAULT_ABILITY_KEY_COUNT = 2;
 const ABILITY_HINT_KEYS = ['J', 'K', 'L', 'U', 'I'];
 const CRYSTAL_FINDER_BONUS_CHANCE_PER_LEVEL = 0.10;
@@ -40,6 +76,8 @@ const Game = {
     rooms: [],
     currentRoom: null,
     roomIndex: 0,
+    currentDungeonId: 'dungeon1',
+    currentDungeon: null,
     coins: 0,
     killCount: 0,
     runCrystalsEarned: 0,
@@ -57,6 +95,7 @@ const Game = {
 
     // Hover state for UI clicks
     hoverBtn: null,
+    hoverDungeon: null,
     hoverClass: null,
     hoverCard: -1,
     hoverShopItem: -1,
@@ -79,6 +118,11 @@ const Game = {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.saveData = SaveSystem.load();
+        if (!Array.isArray(this.saveData.unlockedDungeons)) this.saveData.unlockedDungeons = ['dungeon1'];
+        if (!this.saveData.unlockedDungeons.includes('dungeon1')) this.saveData.unlockedDungeons.push('dungeon1');
+        if (!this.saveData.selectedDungeon || !DUNGEON_DEFS[this.saveData.selectedDungeon]) this.saveData.selectedDungeon = 'dungeon1';
+        this.currentDungeonId = this.saveData.selectedDungeon;
+        this.currentDungeon = DUNGEON_DEFS[this.currentDungeonId] || DUNGEON_DEFS.dungeon1;
         this.crystals = this.saveData.crystals || 0;
         this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         this._updateControlHintText();
@@ -199,6 +243,8 @@ const Game = {
             if (code === 'Digit3') this._selectUpgrade(2);
         } else if (this.state === STATES.CLASS_COLLECTION || this.state === STATES.CLASS_ROLL) {
             if (code === 'Escape') { this.state = STATES.CLASS_SELECT; }
+        } else if (this.state === STATES.DUNGEON_SELECT) {
+            if (code === 'Escape') { this.state = STATES.MENU; }
         } else if (this.state === STATES.SETTINGS) {
             if (code === 'Escape') { this.state = STATES.MENU; }
         }
@@ -214,6 +260,13 @@ const Game = {
             for (const b of btns) {
                 if (mx >= 260 && mx <= 540 && my >= b.y && my <= b.y + 44) { this.hoverBtn = b.id; break; }
             }
+        } else if (this.state === STATES.DUNGEON_SELECT) {
+            this.hoverDungeon = null;
+            const ids = ['dungeon1', 'dungeon2'];
+            ids.forEach((id, i) => {
+                const x = 130 + i * 280, y = 170;
+                if (mx >= x && mx <= x + 240 && my >= y && my <= y + 300) this.hoverDungeon = id;
+            });
         } else if (this.state === STATES.CLASS_SELECT) {
             // Hover on unlocked class cards
             this.hoverClass = null;
@@ -255,16 +308,33 @@ const Game = {
             ];
             for (const b of btns) {
                 if (mx >= 260 && mx <= 540 && my >= b.y && my <= b.y + 44) {
-                    if (b.id === 'play')  this.state = STATES.CLASS_SELECT;
+                    if (b.id === 'play')  this.state = STATES.DUNGEON_SELECT;
                     if (b.id === 'shop')  this.state = STATES.SHOP;
                     if (b.id === 'help')  this.state = STATES.HELP;
                     if (b.id === 'settings') this.state = STATES.SETTINGS;
                     return;
                 }
             }
+        } else if (this.state === STATES.DUNGEON_SELECT) {
+            if (my >= 525 && mx >= 20 && mx <= 160) { this.state = STATES.MENU; return; }
+            const ids = ['dungeon1', 'dungeon2'];
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                const x = 130 + i * 280, y = 170, w = 240, h = 300;
+                if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+                    const unlocked = (this.saveData.unlockedDungeons || ['dungeon1']).includes(id);
+                    if (!unlocked) return;
+                    this.saveData.selectedDungeon = id;
+                    this.currentDungeonId = id;
+                    this.currentDungeon = DUNGEON_DEFS[id] || DUNGEON_DEFS.dungeon1;
+                    SaveSystem.save(this.saveData);
+                    this.state = STATES.CLASS_SELECT;
+                    return;
+                }
+            }
         } else if (this.state === STATES.CLASS_SELECT) {
             // Back button
-            if (my >= 555 && mx >= 20 && mx <= 160) { this.state = STATES.MENU; return; }
+            if (my >= 555 && mx >= 20 && mx <= 160) { this.state = STATES.DUNGEON_SELECT; return; }
             // Roll button
             if (mx >= 600 && mx <= 780 && my >= 530 && my <= 565) { this.state = STATES.CLASS_ROLL; return; }
             // Collection button
@@ -282,7 +352,7 @@ const Game = {
                     this.saveData.selectedClass = id;
                     SaveSystem.save(this.saveData);
                     this._updateControlHintText(id);
-                    this._startRun(id);
+                    this._startRun(id, this.currentDungeonId || this.saveData.selectedDungeon || 'dungeon1');
                 }
             });
         } else if (this.state === STATES.CLASS_COLLECTION) {
@@ -367,7 +437,10 @@ const Game = {
         this.rollAnimPhase = 'spinning';
     },
 
-    _startRun(playerClass) {
+    _startRun(playerClass, dungeonId) {
+        this.currentDungeonId = (dungeonId && DUNGEON_DEFS[dungeonId]) ? dungeonId : 'dungeon1';
+        this.currentDungeon = DUNGEON_DEFS[this.currentDungeonId] || DUNGEON_DEFS.dungeon1;
+        this.saveData.selectedDungeon = this.currentDungeonId;
         this.player = new Player(playerClass);
         this.coins = 0;
         this.killCount = 0;
@@ -385,7 +458,7 @@ const Game = {
         UpgradeSystem.applyPermanent(this.player, this.saveData);
 
         // Generate rooms
-        this.rooms = generateRooms(TOTAL_ROOMS);
+        this.rooms = generateRooms(this.currentDungeon.totalRooms, this.currentDungeonId);
         this.roomIndex = 0;
         this._loadRoom(0);
 
@@ -405,12 +478,15 @@ const Game = {
         this._transitionInProgress = false;
 
         // Scale factor increases with room index
-        this.scaleFactor = 1 + idx * 0.18;
+        const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
+        this.scaleFactor = 1 + idx * (dungeon.enemyScalePerRoom || 0.18);
 
-        // Spawn enemies (boss room on last)
-        if (idx === TOTAL_ROOMS - 1) {
-            this.enemies = [createEnemy('boss_necromancer', 500, 300)];
-        } else if (idx === 4 || idx === 8) {
+        const roomNumber = idx + 1;
+        const bossType = dungeon.roomBosses && dungeon.roomBosses[roomNumber];
+        const isTreasureRoom = Array.isArray(dungeon.treasureRooms) && dungeon.treasureRooms.includes(roomNumber);
+        if (bossType) {
+            this.enemies = [createEnemy(bossType, 500, 300)];
+        } else if (isTreasureRoom || this.currentRoom.roomType === 'treasure_vault') {
             // Treasure/rest room: no enemies
             this.enemies = [];
             this.currentRoom.doorOpen = true;
@@ -574,7 +650,8 @@ const Game = {
         if (!Number.isInteger(roomIndex)) return;
         if (this.claimedRoomCrystalRewards.has(roomIndex)) return;
 
-        let amount = 1;
+        const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
+        let amount = dungeon.crystalPerRoom || 1;
         const crystalFinderLevel = (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_crystal) || 0;
         // Keep this capped for forward compatibility if Crystal Finder max rank increases later.
         const bonusChance = Math.min(1, crystalFinderLevel * CRYSTAL_FINDER_BONUS_CHANCE_PER_LEVEL);
@@ -602,9 +679,15 @@ const Game = {
     },
 
     gameOver() {
+        const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
         // Update best run
         if (this.roomIndex + 1 > this.saveData.bestRun.floor) {
             this.saveData.bestRun = { floor: this.roomIndex + 1, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
+        }
+        this.saveData.bestRunsByDungeon = this.saveData.bestRunsByDungeon || {};
+        const existing = this.saveData.bestRunsByDungeon[dungeon.id];
+        if (!existing || (this.roomIndex + 1) > (existing.floor || 0)) {
+            this.saveData.bestRunsByDungeon[dungeon.id] = { floor: this.roomIndex + 1, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
         }
         SaveSystem.save(this.saveData);
         this._finalizeRunCrystalAccounting('game_over');
@@ -612,9 +695,18 @@ const Game = {
     },
 
     victory() {
-        const bonusCrystals = 5 + Math.floor(this.killCount / 10);
+        const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
+        const bonusCrystals = Math.floor((5 + Math.floor(this.killCount / 10)) * (dungeon.id === 'dungeon2' ? 1.7 : 1));
         this.addCrystals(bonusCrystals, 'victory_bonus');
         this.saveData.bestRun = { floor: this.rooms.length, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
+        this.saveData.bestRunsByDungeon = this.saveData.bestRunsByDungeon || {};
+        this.saveData.bestRunsByDungeon[dungeon.id] = this.saveData.bestRun;
+        this.saveData.dungeonClears = this.saveData.dungeonClears || {};
+        this.saveData.dungeonClears[dungeon.id] = (this.saveData.dungeonClears[dungeon.id] || 0) + 1;
+        if (dungeon.id === 'dungeon1') {
+            this.saveData.unlockedDungeons = this.saveData.unlockedDungeons || ['dungeon1'];
+            if (!this.saveData.unlockedDungeons.includes('dungeon2')) this.saveData.unlockedDungeons.push('dungeon2');
+        }
         SaveSystem.save(this.saveData);
         this._finalizeRunCrystalAccounting('victory');
         this.state = STATES.VICTORY;
@@ -657,6 +749,7 @@ const Game = {
 
         // Player
         p.update(dt, this);
+        if (this.currentRoom && typeof this.currentRoom.update === 'function') this.currentRoom.update(dt, this);
 
         // Enemies
         for (const e of this.enemies) {
@@ -693,11 +786,23 @@ const Game = {
                         }
                         pr.dead = true;
                         if (e.dead) {
+                            if (typeof e.onDeath === 'function') e.onDeath(this);
+                            if (e.type === 'corrupted_slime' && Math.random() < 0.45) {
+                                for (let si = 0; si < 2; si++) {
+                                    this.enemies.push(createEnemy('corrupted_slimelet', e.x + (Math.random() - 0.5) * 28, e.y + (Math.random() - 0.5) * 28));
+                                }
+                            }
+                            if (e.isBoss && this.currentDungeonId === 'dungeon2') {
+                                const bossCrystalBonus = e.type === 'boss_crystal_behemoth' ? 6 : 14;
+                                this.addCrystals(bossCrystalBonus, `boss_bonus_${e.type}`);
+                                this.addDamageNumber(e.x, e.y - 70, 0, '#d7a7ff', { text: `+${bossCrystalBonus} boss crystals`, big: true });
+                            }
                             this.killCount++;
-                            p.gainXp(e.xpReward, this);
-                            this.coins += e.coinReward || 0;
+                            const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
+                            p.gainXp(Math.floor((e.xpReward || 0) * (dungeon.xpMultiplier || 1)), this);
+                            this.coins += Math.floor((e.coinReward || 0) * (dungeon.coinMultiplier || 1));
                             // Crystal drop
-                            if (Math.random() < 0.08 + (e.crystalChance||0)) {
+                            if (Math.random() < 0.08 + (e.crystalChance || 0) + (dungeon.crystalDropBonus || 0)) {
                                 this.addCrystals(1, 'enemy_crystal_drop');
                                 this.addDamageNumber(e.x, e.y-50, 1, '#cc88ff');
                             }
@@ -765,7 +870,8 @@ const Game = {
             this.currentRoom.cleared = true;
             this.currentRoom.openDoor();
             // Bonus coin drop
-            this.coins += 1 + Math.floor(this.roomIndex * 0.5);
+            const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
+            this.coins += Math.floor((1 + Math.floor(this.roomIndex * 0.5)) * (dungeon.coinMultiplier || 1));
         }
 
         // Check portal entry
@@ -790,10 +896,13 @@ const Game = {
                         p.hp = Math.min(p.maxHp, p.hp + 25);
                         this.addDamageNumber(ch.x, ch.y - 30, 25, '#44ff88');
                     } else if (roll < 0.7) {
-                        this.coins += 3 + Math.floor(Math.random()*4);
+                        const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
+                        this.coins += Math.floor((3 + Math.floor(Math.random() * 4)) * (dungeon.coinMultiplier || 1));
                     } else {
-                        this.addCrystals(1, 'chest_crystal_reward');
-                        this.addDamageNumber(ch.x, ch.y - 30, 1, '#cc88ff');
+                        const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
+                        const crystalAmount = dungeon.id === 'dungeon2' ? 2 : 1;
+                        this.addCrystals(crystalAmount, 'chest_crystal_reward');
+                        this.addDamageNumber(ch.x, ch.y - 30, crystalAmount, '#cc88ff');
                     }
                     spawnExplosion(this.particles, ch.x, ch.y, 12, ['#ffcc44','#ffffff'], 100, 5);
                 }
@@ -830,8 +939,11 @@ const Game = {
             case STATES.MENU:
                 UI.renderMenu(ctx, this.saveData, this.hoverBtn);
                 break;
+            case STATES.DUNGEON_SELECT:
+                UI.renderDungeonSelect(ctx, this.saveData, this.hoverDungeon, DUNGEON_DEFS);
+                break;
             case STATES.CLASS_SELECT:
-                UI.renderClassSelect(ctx, this.saveData, this.hoverClass);
+                UI.renderClassSelect(ctx, this.saveData, this.hoverClass, this.currentDungeon || DUNGEON_DEFS.dungeon1);
                 break;
             case STATES.CLASS_COLLECTION:
                 UI.renderClassCollection(ctx, this.saveData);

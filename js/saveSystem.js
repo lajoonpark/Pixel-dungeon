@@ -5,8 +5,12 @@ const SaveSystem = {
         crystals: 0,
         permanentUpgrades: {},
         bestRun: { floor: 0, kills: 0, crystals: 0 },
+        bestRunsByDungeon: {},
         settings: { sfx: true, music: true },
         totalRuns: 0,
+        dungeonClears: {},
+        unlockedDungeons: ['dungeon1'],
+        selectedDungeon: 'dungeon1',
         // Class system
         unlockedClasses: ['human_adventurer'],
         selectedClass: 'human_adventurer',
@@ -36,4 +40,3 @@ const SaveSystem = {
 
     _deep(obj) { return JSON.parse(JSON.stringify(obj)); }
 };
-

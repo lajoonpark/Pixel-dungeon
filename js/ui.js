@@ -66,8 +66,9 @@ const UI = {
         ctx.fillText(`Room ${game.roomIndex + 1} / ${game.rooms.length}`, 338, 23);
 
         // Room dots
-        const dotY = 34, dotSpacing = 14;
-        const startX = 330 + (140 - game.rooms.length * dotSpacing) / 2;
+        const dotY = 34;
+        const dotSpacing = Math.max(4, Math.min(14, 132 / Math.max(1, game.rooms.length)));
+        const startX = 332 + (136 - game.rooms.length * dotSpacing) / 2;
         for (let i = 0; i < game.rooms.length; i++) {
             const dx = startX + i * dotSpacing;
             ctx.beginPath();
@@ -93,7 +94,7 @@ const UI = {
 
         // Boss HP bar (if boss room)
         const boss = game.enemies.find(e => e.isBoss && !e.dead);
-        if (boss) this._renderBossBar(ctx, boss);
+        if (boss) this._renderBossBar(ctx, boss, game);
     },
 
     _renderAbilities(ctx, p, game) {
@@ -142,7 +143,7 @@ const UI = {
         });
     },
 
-    _renderBossBar(ctx, boss) {
+    _renderBossBar(ctx, boss, game) {
         const bw = 600, bh = 22;
         const bx = (800 - bw) / 2, by = 560;
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
@@ -151,10 +152,17 @@ const UI = {
         ctx.fillRect(bx, by, bw, bh);
         const frac = boss.hp / boss.maxHp;
         // Gradient
-        const grad = ctx.createLinearGradient(bx, 0, bx+bw*frac, 0);
-        grad.addColorStop(0, '#aa0044');
-        grad.addColorStop(0.5, '#dd2266');
-        grad.addColorStop(1, '#ff4488');
+        const isCorrupted = game && game.currentDungeonId === 'dungeon2';
+        const grad = ctx.createLinearGradient(bx, 0, bx + bw * frac, 0);
+        if (isCorrupted) {
+            grad.addColorStop(0, '#6f2cff');
+            grad.addColorStop(0.5, '#be44ff');
+            grad.addColorStop(1, '#ff66c4');
+        } else {
+            grad.addColorStop(0, '#aa0044');
+            grad.addColorStop(0.5, '#dd2266');
+            grad.addColorStop(1, '#ff4488');
+        }
         ctx.fillStyle = grad;
         ctx.fillRect(bx, by, bw * frac, bh);
         ctx.strokeStyle = '#880033';
@@ -172,10 +180,12 @@ const UI = {
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 13px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`☠ Necromancer ${boss.phase === 2 ? '(Phase 2)' : ''} — ${Math.ceil(boss.hp)} / ${boss.maxHp}`, 400, by + 15);
+        const bossName = (boss && typeof boss.getDisplayName === 'function') ? boss.getDisplayName() : 'Boss';
+        const phaseText = boss.phase ? ` (Phase ${boss.phase})` : '';
+        ctx.fillText(`☠ ${bossName}${phaseText} — ${Math.ceil(boss.hp)} / ${boss.maxHp}`, 400, by + 15);
         ctx.textAlign = 'left';
 
-        ctx.fillStyle = '#cc88ff';
+        ctx.fillStyle = isCorrupted ? '#c878ff' : '#cc88ff';
         ctx.font = 'bold 11px monospace';
         ctx.textAlign = 'center';
         ctx.fillText('BOSS', 400, by - 6);
@@ -216,7 +226,7 @@ const UI = {
         ctx.fillStyle = '#887799';
         ctx.font = '14px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('Auto-attack roguelite • 12 Classes • 10 Floors', 400, 208);
+        ctx.fillText('Auto-attack roguelite • 12 Classes • 2 Dungeons', 400, 208);
 
         // Buttons
         const btns = [
@@ -267,13 +277,86 @@ const UI = {
         ctx.textAlign = 'left';
     },
 
-    renderClassSelect(ctx, saveData, hoverClass) {
+    renderDungeonSelect(ctx, saveData, hoverDungeon, dungeonDefs) {
+        ctx.fillStyle = '#0a0810';
+        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillStyle = '#ddaaff';
+        ctx.font = 'bold 34px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('SELECT DUNGEON', 400, 70);
+
+        const unlocked = (saveData && saveData.unlockedDungeons) || ['dungeon1'];
+        const selected = (saveData && saveData.selectedDungeon) || 'dungeon1';
+        const ids = ['dungeon1', 'dungeon2'];
+
+        ids.forEach((id, i) => {
+            const d = dungeonDefs[id];
+            const x = 130 + i * 280;
+            const y = 170;
+            const w = 240;
+            const h = 300;
+            const isUnlocked = unlocked.includes(id);
+            const isHover = hoverDungeon === id;
+            const isSelected = selected === id;
+
+            ctx.fillStyle = isHover ? '#231634' : '#170f25';
+            ctx.strokeStyle = isSelected ? '#ffdd66' : (isUnlocked ? '#6f5d88' : '#4b3e5e');
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 12);
+            ctx.fill();
+            ctx.stroke();
+
+            const icon = id === 'dungeon2' ? 'icon_dungeon_corrupted' : 'icon_dungeon_crypt';
+            Assets.draw(ctx, icon, x + w / 2 - 28, y + 15, 56, 56);
+
+            ctx.fillStyle = isUnlocked ? '#ffffff' : '#8f7caa';
+            ctx.font = 'bold 16px monospace';
+            ctx.fillText(d.name, x + w / 2, y + 90);
+
+            ctx.fillStyle = '#b9abd0';
+            ctx.font = '12px monospace';
+            ctx.fillText(`Difficulty: ${d.difficulty}`, x + w / 2, y + 118);
+            ctx.fillText(`Rooms: ${d.totalRooms}`, x + w / 2, y + 138);
+            ctx.fillText(`Bosses: ${d.miniBossRoom ? 'Mini + Final' : 'Final'}`, x + w / 2, y + 158);
+            ctx.fillText(`Rewards: ${d.rewardLabel}`, x + w / 2, y + 178);
+            ctx.fillText(`Status: ${isUnlocked ? 'Unlocked' : 'Locked'}`, x + w / 2, y + 198);
+
+            if (id === 'dungeon2' && !isUnlocked) {
+                ctx.fillStyle = '#cc88aa';
+                ctx.font = '11px monospace';
+                ctx.fillText('Unlock: Clear Dungeon 1 once', x + w / 2, y + 226);
+            } else {
+                ctx.fillStyle = '#88e3b5';
+                ctx.font = '11px monospace';
+                ctx.fillText(isSelected ? 'Selected' : 'Click to select', x + w / 2, y + 226);
+            }
+
+            ctx.fillStyle = '#8f81a8';
+            ctx.font = '10px monospace';
+            const roomText = id === 'dungeon2'
+                ? 'Room Types: Combat, Ritual, Crystal, Maze, Elite, Vault, Flood, Shrine'
+                : 'Themes: Crypt, Forest, Lava';
+            ctx.fillText(roomText.slice(0, 42), x + w / 2, y + 252);
+            if (roomText.length > 42) ctx.fillText(roomText.slice(42), x + w / 2, y + 266);
+        });
+
+        this._menuButton(ctx, '← BACK', 90, 525, '#223344');
+        ctx.textAlign = 'left';
+    },
+
+    renderClassSelect(ctx, saveData, hoverClass, dungeonDef) {
         ctx.fillStyle = '#0a0810';
         ctx.fillRect(0, 0, 800, 600);
         ctx.fillStyle = '#ddaaff';
         ctx.font = 'bold 30px monospace';
         ctx.textAlign = 'center';
         ctx.fillText('SELECT CLASS', 400, 55);
+        if (dungeonDef) {
+            ctx.fillStyle = '#9987b7';
+            ctx.font = '12px monospace';
+            ctx.fillText(`Dungeon: ${dungeonDef.name} • ${dungeonDef.difficulty} • ${dungeonDef.totalRooms} rooms`, 400, 72);
+        }
 
         const unlocked = (saveData && saveData.unlockedClasses) || ['human_adventurer'];
         const selected = (saveData && saveData.selectedClass) || 'human_adventurer';
@@ -285,7 +368,7 @@ const UI = {
         unlocked.forEach((id, i) => {
             const classDef = (typeof ClassSystem !== 'undefined') ? ClassSystem.get(id) : null;
             const col = i % perRow, row = Math.floor(i / perRow);
-            const cx = startX + col*(cardW+gapX), cy = 80 + row*220;
+            const cx = startX + col*(cardW+gapX), cy = 100 + row*220;
             const isHover = hoverClass === id;
             const isSelected = selected === id;
             const rarity = classDef ? classDef.rarity : 'common';
@@ -688,7 +771,16 @@ const UI = {
         ctx.fillStyle = '#aaaacc';
         ctx.font = '18px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`The Necromancer has fallen!`, 400, 220);
+        const dungeonName = (game.currentDungeon && game.currentDungeon.name) || 'Dungeon';
+        const clearText = game.currentDungeonId === 'dungeon2'
+            ? 'The Void Herald has fallen!'
+            : 'The Necromancer has fallen!';
+        ctx.fillText(clearText, 400, 220);
+        ctx.fillStyle = '#9c8bb4';
+        ctx.font = '13px monospace';
+        ctx.fillText(`Cleared: ${dungeonName}`, 400, 242);
+        ctx.fillStyle = '#aaaacc';
+        ctx.font = '18px monospace';
         ctx.fillText(`Floors cleared: ${game.rooms.length}`, 400, 256);
         ctx.fillText(`Enemies slain: ${game.killCount}`, 400, 284);
         ctx.fillStyle = '#ffcc44';
@@ -817,7 +909,7 @@ const UI = {
             ['Gameplay', '#ffcc88'],
             ['Auto-attack fires at nearest enemy in range.', '#cccccc'],
             ['Clear all enemies to open the exit door.', '#cccccc'],
-            ['Progress through 10 rooms to face the Boss!', '#cccccc'],
+            ['Progress through your selected dungeon to face its Boss!', '#cccccc'],
             ['Level up to choose powerful upgrades.', '#cccccc'],
             ['Earn crystals to buy permanent upgrades.', '#cccccc'],
             ['', ''],
