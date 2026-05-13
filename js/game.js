@@ -27,6 +27,9 @@ const DUNGEON_DEFS = {
         finalBossRoom: 10,
         rewardLabel: '+1 crystal / room',
         crystalPerRoom: 1,
+        victoryBaseCrystals: 5,
+        victoryKillDivisor: 10,
+        victoryMultiplier: 1,
         enemyScalePerRoom: 0.18,
         eliteBias: 1,
         coinMultiplier: 1,
@@ -44,6 +47,9 @@ const DUNGEON_DEFS = {
         finalBossRoom: 20,
         rewardLabel: '+2 crystals / room',
         crystalPerRoom: 2,
+        victoryBaseCrystals: 5,
+        victoryKillDivisor: 10,
+        victoryMultiplier: 1.7,
         enemyScalePerRoom: 0.2,
         eliteBias: 1.25,
         coinMultiplier: 1.35,
@@ -118,8 +124,6 @@ const Game = {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.saveData = SaveSystem.load();
-        if (!Array.isArray(this.saveData.unlockedDungeons)) this.saveData.unlockedDungeons = ['dungeon1'];
-        if (!this.saveData.unlockedDungeons.includes('dungeon1')) this.saveData.unlockedDungeons.push('dungeon1');
         if (!this.saveData.selectedDungeon || !DUNGEON_DEFS[this.saveData.selectedDungeon]) this.saveData.selectedDungeon = 'dungeon1';
         this.currentDungeonId = this.saveData.selectedDungeon;
         this.currentDungeon = DUNGEON_DEFS[this.currentDungeonId] || DUNGEON_DEFS.dungeon1;
@@ -696,7 +700,10 @@ const Game = {
 
     victory() {
         const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
-        const bonusCrystals = Math.floor((5 + Math.floor(this.killCount / 10)) * (dungeon.id === 'dungeon2' ? 1.7 : 1));
+        const bonusCrystals = Math.floor(
+            ((dungeon.victoryBaseCrystals || 5) + Math.floor(this.killCount / (dungeon.victoryKillDivisor || 10)))
+            * (dungeon.victoryMultiplier || 1)
+        );
         this.addCrystals(bonusCrystals, 'victory_bonus');
         this.saveData.bestRun = { floor: this.rooms.length, kills: this.killCount, crystals: this.runCrystalsEarned || 0 };
         this.saveData.bestRunsByDungeon = this.saveData.bestRunsByDungeon || {};

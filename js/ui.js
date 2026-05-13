@@ -67,7 +67,10 @@ const UI = {
 
         // Room dots
         const dotY = 34;
-        const dotSpacing = Math.max(4, Math.min(14, 132 / Math.max(1, game.rooms.length)));
+        const MIN_DOT_SPACING = 4;
+        const MAX_DOT_SPACING = 14;
+        const AVAILABLE_DOT_WIDTH = 132;
+        const dotSpacing = Math.max(MIN_DOT_SPACING, Math.min(MAX_DOT_SPACING, AVAILABLE_DOT_WIDTH / Math.max(1, game.rooms.length)));
         const startX = 332 + (136 - game.rooms.length * dotSpacing) / 2;
         for (let i = 0; i < game.rooms.length; i++) {
             const dx = startX + i * dotSpacing;
@@ -226,7 +229,8 @@ const UI = {
         ctx.fillStyle = '#887799';
         ctx.font = '14px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('Auto-attack roguelite • 12 Classes • 2 Dungeons', 400, 208);
+        const dungeonCount = (typeof DUNGEON_DEFS !== 'undefined') ? Object.keys(DUNGEON_DEFS).length : 2;
+        ctx.fillText(`Auto-attack roguelite • 12 Classes • ${dungeonCount} Dungeons`, 400, 208);
 
         // Buttons
         const btns = [

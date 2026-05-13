@@ -21,6 +21,7 @@ const THEMES = {
 const TILE_SIZE = 40;
 const GRID_W = 20;
 const GRID_H = 15;
+const MAX_CORRUPTION_TILE_PLACEMENT_ATTEMPTS = 25;
 
 const ENEMY_SPAWN_RADII = {
     slime: 18, bat: 16, skeleton: 20, spider: 19, bomber: 18, healer: 19, summoner: 21,
@@ -230,7 +231,7 @@ class Room {
         const validTiles = [];
         for (let row = 1; row < GRID_H - 1; row++) {
             for (let col = Math.floor(GRID_W / 2); col < GRID_W - 2; col++) {
-                if (this.tiles[row][col] === TILE.WALL || this.tiles[row][col] === TILE.DOOR) continue;
+                if (this.tiles[row][col] !== TILE.FLOOR) continue;
                 const wx = (col + 0.5) * TILE_SIZE;
                 const wy = (row + 0.5) * TILE_SIZE;
                 if (playerX !== undefined && playerY !== undefined) {
@@ -332,13 +333,13 @@ class Room {
             if (this.corruptionTimer >= 1.5) {
                 this.corruptionTimer = 0;
                 this.corruptionSpreadSteps++;
-                this._spreadCorruption(game);
+                this.spreadCorruptionTile(game);
             }
         }
     }
 
     _spreadCorruption(game) {
-        for (let attempt = 0; attempt < 25; attempt++) {
+        for (let attempt = 0; attempt < MAX_CORRUPTION_TILE_PLACEMENT_ATTEMPTS; attempt++) {
             const r = 2 + Math.floor(Math.random() * (GRID_H - 4));
             const c = 2 + Math.floor(Math.random() * (GRID_W - 4));
             if (this.tiles[r][c] === TILE.FLOOR || this.tiles[r][c] === TILE.POISON) {
@@ -347,6 +348,10 @@ class Room {
                 return;
             }
         }
+    }
+
+    spreadCorruptionTile(game) {
+        this._spreadCorruption(game);
     }
 
     render(ctx) {

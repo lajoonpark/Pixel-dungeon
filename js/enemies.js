@@ -1,5 +1,6 @@
 'use strict';
 
+// Elite modifiers extend base enemies with additional effects while preserving existing AI architecture.
 const ELITE_MODIFIERS = ['burning', 'toxic', 'vampiric', 'frenzied', 'shielded', 'arcane', 'explosive', 'regenerating'];
 const ELITE_AURA_COLORS = {
     burning: '#ff7a1a',
@@ -325,7 +326,10 @@ class Healer extends Enemy {
                 target.hp = Math.min(target.maxHp, target.hp + target.maxHp * 0.2);
                 spawnExplosion(game.particles, target.x, target.y, 8, ['#44ff88', '#88ffaa'], 60, 5);
             } else {
-                this._chasePlayer(dt, target, game);
+                const nx = this.x + (dx / dist) * this.moveSpeed * dt;
+                const ny = this.y + (dy / dist) * this.moveSpeed * dt;
+                if (!game.currentRoom || !game.currentRoom.isWall(nx, this.y)) this.x = nx;
+                if (!game.currentRoom || !game.currentRoom.isWall(this.x, ny)) this.y = ny;
             }
         } else {
             this._chasePlayer(dt, player, game);
@@ -451,6 +455,8 @@ class Cultist extends Enemy {
 }
 
 class CrystalGolem extends Enemy {
+    static VULNERABLE_DAMAGE_MULTIPLIER = 1.5;
+
     constructor(x, y, isElite, eliteModifier) {
         super({ x, y, hp: isElite ? 240 : 170, atk: 22, moveSpeed: 45, attackCooldown: 2.4, attackRange: 54, size: 25, xpReward: 52, coinReward: 3, spriteKey: 'enemy_crystal_golem', type: 'crystal_golem', isElite, eliteModifier, crystalChance: 0.2 });
         this.slamTimer = 1.5;
@@ -458,7 +464,7 @@ class CrystalGolem extends Enemy {
     }
     _incomingDamageMultiplier() {
         const base = super._incomingDamageMultiplier();
-        return this.vulnerableTimer > 0 ? base * 1.5 : base;
+        return this.vulnerableTimer > 0 ? base * CrystalGolem.VULNERABLE_DAMAGE_MULTIPLIER : base;
     }
     update(dt, player, game) {
         super.update(dt, player, game);
@@ -716,8 +722,8 @@ class CrystalBehemoth extends Enemy {
                 const r = 70 + Math.random() * 70;
                 game.enemies.push(new CrystalTurret(this.x + Math.cos(a) * r, this.y + Math.sin(a) * r, false));
             }
-            if (game.currentRoom && game.currentRoom.tiles) {
-                for (let i = 0; i < (this.phase === 2 ? 3 : 2); i++) game.currentRoom._spreadCorruption(game);
+            if (game.currentRoom && typeof game.currentRoom.spreadCorruptionTile === 'function') {
+                for (let i = 0; i < (this.phase === 2 ? 3 : 2); i++) game.currentRoom.spreadCorruptionTile(game);
             }
         }
     }
@@ -791,10 +797,10 @@ class VoidHerald extends Enemy {
             }
         }
 
-        if (this.hazardTimer <= 0 && game.currentRoom && game.currentRoom.tiles) {
+        if (this.hazardTimer <= 0 && game.currentRoom && typeof game.currentRoom.spreadCorruptionTile === 'function') {
             this.hazardTimer = this.phase === 3 ? 0.8 : 1.7;
             const pulses = this.phase === 3 ? 3 : 1;
-            for (let i = 0; i < pulses; i++) game.currentRoom._spreadCorruption(game);
+            for (let i = 0; i < pulses; i++) game.currentRoom.spreadCorruptionTile(game);
         }
     }
 }
