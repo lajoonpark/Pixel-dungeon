@@ -175,7 +175,7 @@ const permanentUpgradeCategories = {
             icon: 'upgrade_dash',
             nextRankPreview(rank) { return `Ability cooldown -${(rank + 1) * 5}%`; },
             applyEffect(p, rank) {
-                p.abilityCooldownMult = (p.abilityCooldownMult || 1) * Math.max(0, 1 - (rank * 0.05));
+                p.abilityCooldownMult *= (1 - (rank * 0.05));
             }
         }
     ],
