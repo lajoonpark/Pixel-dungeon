@@ -19,6 +19,8 @@ const RARITY_COLORS = {
 };
 
 const BASE_RARITY_WEIGHTS = { common: 60, rare: 25, epic: 10, legendary: 4, mythic: 1 };
+const MIN_COMMON_WEIGHT = 35;
+const FORTUNE_WEIGHT_SHIFTS = { common: 2.0, rare: 1.0, epic: 0.6, legendary: 0.3, mythic: 0.1 };
 
 // ── Class definitions ─────────────────────────────────────────────────────────
 // Each class:  id, name, rarity, stats, passiveDesc, description, abilityIds,
@@ -311,11 +313,11 @@ const ClassSystem = {
     getRarityWeights(fortuneRank = 0) {
         const rank = Math.max(0, Math.min(5, fortuneRank | 0));
         const adjusted = {
-            common: Math.max(35, BASE_RARITY_WEIGHTS.common - rank * 2.0),
-            rare: BASE_RARITY_WEIGHTS.rare + rank * 1.0,
-            epic: BASE_RARITY_WEIGHTS.epic + rank * 0.6,
-            legendary: BASE_RARITY_WEIGHTS.legendary + rank * 0.3,
-            mythic: BASE_RARITY_WEIGHTS.mythic + rank * 0.1
+            common: Math.max(MIN_COMMON_WEIGHT, BASE_RARITY_WEIGHTS.common - rank * FORTUNE_WEIGHT_SHIFTS.common),
+            rare: BASE_RARITY_WEIGHTS.rare + rank * FORTUNE_WEIGHT_SHIFTS.rare,
+            epic: BASE_RARITY_WEIGHTS.epic + rank * FORTUNE_WEIGHT_SHIFTS.epic,
+            legendary: BASE_RARITY_WEIGHTS.legendary + rank * FORTUNE_WEIGHT_SHIFTS.legendary,
+            mythic: BASE_RARITY_WEIGHTS.mythic + rank * FORTUNE_WEIGHT_SHIFTS.mythic
         };
         const total = Object.values(adjusted).reduce((a, b) => a + b, 0);
         const scale = total > 0 ? 100 / total : 1;

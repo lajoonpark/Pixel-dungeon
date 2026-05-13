@@ -1,5 +1,7 @@
 'use strict';
 
+const PLAYER_MAX_DODGE_CHANCE = 0.5;
+
 class Player {
     constructor(classId) {
         const classDef = (typeof ClassSystem !== 'undefined' && ClassSystem.get(classId))
@@ -123,7 +125,7 @@ class Player {
             ? gameArg
             : ((sourceOrContext && typeof sourceOrContext === 'object') ? sourceOrContext : null);
 
-        const dodgeChance = Math.min(0.5, Math.max(0, this.dodgeChance || 0));
+        const dodgeChance = Math.min(PLAYER_MAX_DODGE_CHANCE, Math.max(0, this.dodgeChance || 0));
         if (dodgeChance > 0 && Math.random() < dodgeChance) {
             if (game && typeof game.addDamageNumber === 'function') {
                 game.addDamageNumber(this.x, this.y - 40, 0, '#88ddff', { text: 'DODGE', big: true, role: 'player' });

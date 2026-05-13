@@ -812,7 +812,10 @@ const UI = {
 
         ctx.fillStyle = '#887766';
         ctx.font = '14px monospace';
-        ctx.fillText('"Defense • Offense • Utility"', 130, 75);
+        const categoryLabel = (typeof UpgradeSystem !== 'undefined' && typeof UpgradeSystem.getPermanentCategories === 'function')
+            ? UpgradeSystem.getPermanentCategories().map(c => c[0].toUpperCase() + c.slice(1)).join(' • ')
+            : 'Defense • Offense • Utility';
+        ctx.fillText(`"${categoryLabel}"`, 130, 75);
 
         // Crystal balance
         Assets.draw(ctx, 'icon_crystal', 680, 10, 20, 20);
@@ -886,7 +889,7 @@ const UI = {
 
             ctx.fillStyle = '#9988aa';
             ctx.font = '11px monospace';
-            ctx.fillText(pu.description || pu.desc, x + 8, y + 55);
+            ctx.fillText(pu.description || '', x + 8, y + 55);
             ctx.fillStyle = '#99b6ff';
             ctx.fillText(`Effect: ${pu.effectPerRank || ''}`, x + 8, y + 73);
 

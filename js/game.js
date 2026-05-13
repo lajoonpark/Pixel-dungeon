@@ -695,7 +695,7 @@ const Game = {
         const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
         let amount = dungeon.crystalPerRoom || 1;
         const crystalHoarderRank = (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_crystal) || 0;
-        amount += Math.max(0, crystalHoarderRank | 0);
+        amount += crystalHoarderRank;
 
         this.addCrystals(amount, `room_clear_${roomIndex + 1}`);
 
