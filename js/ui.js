@@ -361,7 +361,7 @@ const UI = {
         ctx.textAlign = 'left';
 
         // Buttons row at bottom
-        const rollCost = (saveData && saveData.rollCost) || 20;
+        const rollCost = (saveData && saveData.rollCost) || 10;
         const canAfford = saveData && saveData.crystals >= rollCost;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(0, 525, 800, 75);
@@ -484,7 +484,7 @@ const UI = {
         ctx.textAlign = 'center';
         ctx.fillText('CLASS ROLL', 400, 60);
 
-        const cost = (saveData && saveData.rollCost) || 20;
+        const cost = (saveData && saveData.rollCost) || 10;
         const crystals = (saveData && saveData.crystals) || 0;
         const rollCount = (saveData && saveData.rollCount) || 0;
         const canAfford = crystals >= cost;

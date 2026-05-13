@@ -338,11 +338,11 @@ const Game = {
 
     _doRoll() {
         if (this.rollAnimActive) return;
-        const cost = this.saveData.rollCost || 20;
+        const cost = this.saveData.rollCost || 10;
         if (!this.spendCrystals(cost, 'class_roll_cost')) return; // can't afford
         this.saveData.rollCount = (this.saveData.rollCount || 0) + 1;
-        // Scale cost: +10 per roll, cap at 100
-        this.saveData.rollCost = Math.min(100, cost + 10);
+        // Scale cost: +3 per roll, cap at 50
+        this.saveData.rollCost = Math.min(50, cost + 3);
 
         const result = (typeof ClassSystem !== 'undefined') ? ClassSystem.roll() : { id: 'human_adventurer' };
         const unlocked = this.saveData.unlockedClasses || ['human_adventurer'];
