@@ -114,8 +114,8 @@ Only **Human Adventurer** is unlocked at the start. All others must be obtained 
 
 - **Defense:** Fortified Body, Iron Skin, Fleet Footed, Evasion Training  
   Focused on survivability, mitigation, mobility, and dodge.
-- **Offense:** Combat Training, Arcane Mastery, Rapid Strikes  
-  Focused on basic attack damage, ability damage scaling, and attack speed.
+- **Offense:** Combat Training, Arcane Mastery, Rapid Strikes, Cooldown Mastery  
+  Focused on basic attack damage, ability damage scaling, attack speed, and cooldown reduction.
 - **Utility:** Fortune, Crystal Hoarder  
   Focused on class-roll rarity progression and guaranteed crystal income.
 

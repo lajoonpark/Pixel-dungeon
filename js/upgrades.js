@@ -162,6 +162,21 @@ const permanentUpgradeCategories = {
             applyEffect(p, rank) {
                 p.atkSpeedMult *= Math.pow(1.08, rank);
             }
+        },
+        {
+            id: 'p_cooldown',
+            category: 'offense',
+            name: 'Cooldown Mastery',
+            description: '-5% ability cooldown per rank.',
+            maxRank: 5,
+            effectPerRank: '-5% ability cooldown',
+            costFormula: permanentCostFormula,
+            costPerRank: PERMANENT_COSTS,
+            icon: 'upgrade_dash',
+            nextRankPreview(rank) { return `Ability cooldown -${(rank + 1) * 5}%`; },
+            applyEffect(p, rank) {
+                p.abilityCooldownMult *= (1 - (rank * 0.05));
+            }
         }
     ],
     utility: [
