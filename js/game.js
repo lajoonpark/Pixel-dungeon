@@ -12,8 +12,10 @@ const STATES = {
     LEVELUP:           'levelup',
     GAMEOVER:          'gameover',
     VICTORY:           'victory',
-    SHOP:              'shop',
+    CARD_SHOP:         'card_shop',
+    PERMANENT_SHOP:    'permanent_shop',
     HELP:              'help',
+    CARDS:             'cards',
     SETTINGS:          'settings',
 };
 
@@ -106,6 +108,11 @@ const Game = {
     hoverShopItem: -1,
     hoverShopTab: null,
     selectedShopCategory: 'defense',
+    hoverCardMenuItem: -1,
+    cardsMenuPage: 0,
+    cardsMenuRarityFilter: 'all',
+    cardsMenuTypeFilter: 'all',
+    hoverCardShopItem: -1,
 
     // Mobile joystick
     joystick: { active: false, startX: 0, startY: 0, dx: 0, dy: 0 },
@@ -114,6 +121,9 @@ const Game = {
     // Persistent save data
     saveData: null,
     crystals: 0,
+    activeCards: [],
+    runClock: 0,
+    _queuedAbilityRepeat: null,
 
     // Stability flags
     _loopRunning: false,
@@ -125,11 +135,15 @@ const Game = {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.saveData = SaveSystem.load();
+        if (typeof UpgradeSystem !== 'undefined' && typeof UpgradeSystem.normalizeOwnedAndEquipped === 'function') {
+            UpgradeSystem.normalizeOwnedAndEquipped(this.saveData);
+        }
         if (!this.saveData.selectedDungeon || !DUNGEON_DEFS[this.saveData.selectedDungeon]) this.saveData.selectedDungeon = 'dungeon1';
         this.selectedShopCategory = UpgradeSystem.getPermanentCategories()[0] || 'defense';
         this.currentDungeonId = this.saveData.selectedDungeon;
         this.currentDungeon = DUNGEON_DEFS[this.currentDungeonId] || DUNGEON_DEFS.dungeon1;
         this.crystals = this.saveData.crystals || 0;
+        this.coins = this.saveData.coins || 0;
         this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         this._updateControlHintText();
 
@@ -235,11 +249,11 @@ const Game = {
         if (this.state === STATES.PLAYING) {
             if (code === 'Escape') { this.state = STATES.PAUSED; return; }
             if (this.player && this.player.abilities) {
-                if (code === 'KeyJ' && this.player.abilities[0]) this.player.abilities[0].use(this);
-                if (code === 'KeyK' && this.player.abilities[1]) this.player.abilities[1].use(this);
-                if (code === 'KeyL' && this.player.abilities[2]) this.player.abilities[2].use(this);
-                if (code === 'KeyU' && this.player.abilities[3]) this.player.abilities[3].use(this);
-                if (code === 'KeyI' && this.player.abilities[4]) this.player.abilities[4].use(this);
+                if (code === 'KeyJ' && this.player.abilities[0]) this.castAbility(this.player.abilities[0]);
+                if (code === 'KeyK' && this.player.abilities[1]) this.castAbility(this.player.abilities[1]);
+                if (code === 'KeyL' && this.player.abilities[2]) this.castAbility(this.player.abilities[2]);
+                if (code === 'KeyU' && this.player.abilities[3]) this.castAbility(this.player.abilities[3]);
+                if (code === 'KeyI' && this.player.abilities[4]) this.castAbility(this.player.abilities[4]);
             }
         } else if (this.state === STATES.PAUSED) {
             if (code === 'Escape') { this.state = STATES.PLAYING; }
@@ -251,6 +265,10 @@ const Game = {
             if (code === 'Escape') { this.state = STATES.CLASS_SELECT; }
         } else if (this.state === STATES.DUNGEON_SELECT) {
             if (code === 'Escape') { this.state = STATES.MENU; }
+        } else if (this.state === STATES.CARDS || this.state === STATES.CARD_SHOP || this.state === STATES.PERMANENT_SHOP) {
+            if (code === 'Escape') { this.state = STATES.MENU; }
+        } else if (this.state === STATES.HELP) {
+            if (code === 'Escape') { this.state = STATES.SETTINGS; }
         } else if (this.state === STATES.SETTINGS) {
             if (code === 'Escape') { this.state = STATES.MENU; }
         }
@@ -260,7 +278,8 @@ const Game = {
         const mx = this.mouse.x, my = this.mouse.y;
         if (this.state === STATES.MENU) {
             const btns = [
-                { id:'play', y:245 }, { id:'shop', y:300 }, { id:'help', y:355 }, { id:'settings', y:410 }
+                { id:'play', y:225 }, { id:'class_select', y:270 }, { id:'cards', y:315 },
+                { id:'card_shop', y:360 }, { id:'permanent_shop', y:405 }, { id:'settings', y:450 }
             ];
             this.hoverBtn = null;
             for (const b of btns) {
@@ -297,7 +316,7 @@ const Game = {
                 if (mx >= x && mx <= x+cardW && my >= 160 && my <= 390) this.hoverCard = i;
             });
             UI._hoveredCard = this.hoverCard;
-        } else if (this.state === STATES.SHOP) {
+        } else if (this.state === STATES.PERMANENT_SHOP) {
             this.hoverShopTab = null;
             const categories = UpgradeSystem.getPermanentCategories();
             categories.forEach((category, idx) => {
@@ -317,19 +336,40 @@ const Game = {
                 const y = 150 + row * 190;
                 if (mx >= x && mx <= x + 250 && my >= y && my <= y + 170) this.hoverShopItem = i;
             });
+        } else if (this.state === STATES.CARDS) {
+            this.hoverCardMenuItem = -1;
+            const cards = this.getVisibleCardsForMenu();
+            cards.forEach((_, i) => {
+                const col = i % 4;
+                const row = Math.floor(i / 4);
+                const x = 70 + col * 170;
+                const y = 180 + row * 170;
+                if (mx >= x && mx <= x + 150 && my >= y && my <= y + 150) this.hoverCardMenuItem = i;
+            });
+        } else if (this.state === STATES.CARD_SHOP) {
+            this.hoverCardShopItem = -1;
+            const inventory = this.getCardShopInventory().cards;
+            inventory.forEach((_, i) => {
+                const x = 70 + i * 180;
+                const y = 210;
+                if (mx >= x && mx <= x + 160 && my >= y && my <= y + 220) this.hoverCardShopItem = i;
+            });
         }
     },
 
     _onClick(mx, my) {
         if (this.state === STATES.MENU) {
             const btns = [
-                { id:'play', y:245 }, { id:'shop', y:300 }, { id:'help', y:355 }, { id:'settings', y:410 }
+                { id:'play', y:225 }, { id:'class_select', y:270 }, { id:'cards', y:315 },
+                { id:'card_shop', y:360 }, { id:'permanent_shop', y:405 }, { id:'settings', y:450 }
             ];
             for (const b of btns) {
                 if (mx >= 260 && mx <= 540 && my >= b.y && my <= b.y + 44) {
                     if (b.id === 'play')  this.state = STATES.DUNGEON_SELECT;
-                    if (b.id === 'shop')  this.state = STATES.SHOP;
-                    if (b.id === 'help')  this.state = STATES.HELP;
+                    if (b.id === 'class_select') this.state = STATES.CLASS_SELECT;
+                    if (b.id === 'cards') this.state = STATES.CARDS;
+                    if (b.id === 'card_shop') this.state = STATES.CARD_SHOP;
+                    if (b.id === 'permanent_shop') this.state = STATES.PERMANENT_SHOP;
                     if (b.id === 'settings') this.state = STATES.SETTINGS;
                     return;
                 }
@@ -396,9 +436,9 @@ const Game = {
             if (my >= 390 && my <= 430 && mx >= 290 && mx <= 510) { this.state = STATES.CLASS_SELECT; }
             if (my >= 450 && my <= 490 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
         } else if (this.state === STATES.VICTORY) {
-            if (my >= 390 && my <= 430 && mx >= 290 && mx <= 510) { this.state = STATES.SHOP; }
+            if (my >= 390 && my <= 430 && mx >= 290 && mx <= 510) { this.state = STATES.PERMANENT_SHOP; }
             if (my >= 450 && my <= 490 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
-        } else if (this.state === STATES.SHOP) {
+        } else if (this.state === STATES.PERMANENT_SHOP) {
             if (my >= 560) { this.state = STATES.MENU; return; }
 
             const categories = UpgradeSystem.getPermanentCategories();
@@ -425,15 +465,43 @@ const Game = {
                     this._buyPermanentUpgrade(pu);
                 }
             });
+        } else if (this.state === STATES.CARD_SHOP) {
+            if (my >= 560) { this.state = STATES.MENU; return; }
+            this.buyCardFromShop(this.hoverCardShopItem);
+        } else if (this.state === STATES.CARDS) {
+            if (my >= 560) { this.state = STATES.MENU; return; }
+            if (mx >= 40 && mx <= 170 && my >= 95 && my <= 125) { this.cycleCardsRarityFilter(); return; }
+            if (mx >= 190 && mx <= 360 && my >= 95 && my <= 125) { this.cycleCardsTypeFilter(); return; }
+            if (mx >= 590 && mx <= 760 && my >= 95 && my <= 125) { this.saveCurrentCardsToPreset(); return; }
+            if (mx >= 590 && mx <= 760 && my >= 130 && my <= 160) { this.loadSelectedCardPreset(); return; }
+            if (mx >= 590 && mx <= 760 && my >= 165 && my <= 195) { this.renameSelectedCardPreset(); return; }
+            if (mx >= 590 && mx <= 760 && my >= 200 && my <= 230) { this.createCardPreset(); return; }
+            if (mx >= 590 && mx <= 760 && my >= 235 && my <= 265) { this.deleteSelectedCardPreset(); return; }
+            if (mx >= 590 && mx <= 760 && my >= 270 && my <= 300) { this.selectNextCardPreset(); return; }
+            const cards = this.getVisibleCardsForMenu();
+            cards.forEach((card, i) => {
+                const col = i % 4;
+                const row = Math.floor(i / 4);
+                const x = 70 + col * 170;
+                const y = 180 + row * 170;
+                if (mx >= x && mx <= x + 150 && my >= y && my <= y + 150) {
+                    this.toggleCardEquip(card.id);
+                }
+            });
         } else if (this.state === STATES.PAUSED) {
             if (my >= 410 && my <= 450 && mx >= 290 && mx <= 510) { this.state = STATES.PLAYING; }
             if (my >= 465 && my <= 505 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
         } else if (this.state === STATES.HELP) {
-            if (my >= 540 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
+            if (my >= 540 && mx >= 290 && mx <= 510) { this.state = STATES.SETTINGS; }
         } else if (this.state === STATES.SETTINGS) {
+            if (my >= 240 && my <= 280 && mx >= 290 && mx <= 510) { this.state = STATES.HELP; return; }
             if (my >= 300 && my <= 340 && mx >= 290 && mx <= 510) {
                 if (window.confirm('Delete all save data? This cannot be undone.')) {
                     this.saveData = SaveSystem.reset();
+                    if (typeof UpgradeSystem !== 'undefined' && typeof UpgradeSystem.normalizeOwnedAndEquipped === 'function') {
+                        UpgradeSystem.normalizeOwnedAndEquipped(this.saveData);
+                    }
+                    this.coins = this.saveData.coins || 0;
                     this._updateControlHintText();
                     this.state = STATES.MENU;
                 }
@@ -480,12 +548,13 @@ const Game = {
         this.currentDungeon = DUNGEON_DEFS[this.currentDungeonId] || DUNGEON_DEFS.dungeon1;
         this.saveData.selectedDungeon = this.currentDungeonId;
         this.player = new Player(playerClass);
-        this.coins = 0;
+        this.coins = this.saveData.coins || 0;
         this.killCount = 0;
         this.runCrystalsEarned = 0;
         this.startingCrystals = this.crystals || 0;
         this.crystalTransactions = [];
         this.isRunActive = true;
+        this.runClock = 0;
         this.projectiles = [];
         this.particles = [];
         this.damageNumbers = [];
@@ -494,6 +563,11 @@ const Game = {
 
         // Apply permanent upgrades
         UpgradeSystem.applyPermanent(this.player, this.saveData);
+        this.activeCards = UpgradeSystem.getDungeonCardPool(this.player, this.saveData);
+        for (const card of this.activeCards) {
+            if (typeof card.apply === 'function') card.apply(this.player, this);
+        }
+        this.triggerCardHook('onRunStart', {});
 
         // Generate rooms
         this.rooms = generateRooms(this.currentDungeon.totalRooms, this.currentDungeonId);
@@ -509,6 +583,7 @@ const Game = {
     _loadRoom(idx) {
         this.roomIndex = idx;
         this.currentRoom = this.rooms[idx];
+        this.currentRoomStartedAt = this.runClock || 0;
         this.player.x = 80;
         this.player.y = 300;
         this.projectiles = [];
@@ -524,6 +599,7 @@ const Game = {
         const isTreasureRoom = Array.isArray(dungeon.treasureRooms) && dungeon.treasureRooms.includes(roomNumber);
         if (bossType) {
             this.enemies = [createEnemy(bossType, 500, 300)];
+            if (roomNumber === dungeon.miniBossRoom && this.enemies[0]) this.enemies[0].isMiniBoss = true;
         } else if (isTreasureRoom || this.currentRoom.roomType === 'treasure_vault') {
             // Treasure/rest room: no enemies
             this.enemies = [];
@@ -532,6 +608,7 @@ const Game = {
         } else {
             this.enemies = this.currentRoom.spawnEnemies(idx, this.scaleFactor, this.player.x, this.player.y);
         }
+        this.triggerCardHook('onRoomStart', { roomIndex: idx, roomNumber });
 
         console.log(`[PixelDungeon] Room ${idx + 1} start — enemies: ${this.enemies.length}`);
     },
@@ -551,7 +628,7 @@ const Game = {
 
     triggerLevelUp() {
         const prevState = this.state;
-        this.upgradeChoices = UpgradeSystem.roll(this.player, 3);
+        this.upgradeChoices = UpgradeSystem.roll(this.player, this.saveData, 3);
         this.state = STATES.LEVELUP;
         this.hoverCard = -1;
         UI._hoveredCard = -1;
@@ -559,7 +636,7 @@ const Game = {
 
     _selectUpgrade(i) {
         if (i >= 0 && i < this.upgradeChoices.length) {
-            this.upgradeChoices[i].apply(this.player);
+            this.upgradeChoices[i].apply(this.player, this);
             this.state = STATES.PLAYING;
         }
     },
@@ -668,6 +745,223 @@ const Game = {
         SaveSystem.save(this.saveData);
         console.log(`[PixelDungeon] -${amount} crystals (${reason || 'unknown'}). Total: ${this.crystals}`);
         return true;
+    },
+
+    addCoins(amount, reason, options = {}) {
+        amount = Math.max(0, Number.isFinite(amount) ? amount : 0);
+        if (amount <= 0) return 0;
+        let finalAmount = amount;
+        if (this.player && reason && reason.startsWith('enemy_kill')) {
+            finalAmount *= (this.player.enemyCoinGainMult || 1);
+        }
+        finalAmount = Math.max(0, Math.floor(finalAmount));
+        this.coins = (this.coins || 0) + finalAmount;
+        this.saveData.coins = this.coins;
+        SaveSystem.save(this.saveData);
+        if (!options.silent && this.player && this.state === STATES.PLAYING) {
+            this.addDamageNumber(this.player.x, this.player.y - 56, 0, '#ffcc44', { text: `+${finalAmount} coins` });
+        }
+        return finalAmount;
+    },
+
+    spendCoins(amount, reason) {
+        amount = Math.max(0, Math.floor(amount || 0));
+        if (amount <= 0) return true;
+        if ((this.coins || 0) < amount) return false;
+        this.coins -= amount;
+        this.saveData.coins = this.coins;
+        SaveSystem.save(this.saveData);
+        console.log(`[PixelDungeon] -${amount} coins (${reason || 'unknown'}). Total: ${this.coins}`);
+        return true;
+    },
+
+    triggerCardHook(hookName, payload = {}) {
+        if (!Array.isArray(this.activeCards)) return;
+        for (const card of this.activeCards) {
+            if (!card || typeof card[hookName] !== 'function') continue;
+            try {
+                card[hookName](this.player, this, payload);
+            } catch (err) {
+                console.error(`[PixelDungeon] card hook error (${card.id}.${hookName})`, err);
+            }
+        }
+    },
+
+    castAbility(ability, options = {}) {
+        if (!ability || typeof ability.use !== 'function') return false;
+        const p = this.player;
+        if (!p) return false;
+        const now = this.runClock || 0;
+        const originalAbilityDmgMult = p.abilityDmgMult || 1;
+        const originalAtkMult = p.atkMult || 1;
+        const originalCooldown = ability.cooldown;
+        let castMult = Number.isFinite(options.damageMult) ? options.damageMult : 1;
+
+        if (!options.isRepeat && p.manaBatteryBonus && now <= (p.manaBatteryUntil || 0)) {
+            const abilityId = ability.abilityId || ability.name || ability.key;
+            if (abilityId !== p.manaBatterySourceAbilityId) {
+                castMult *= p.manaBatteryBonus;
+                p.manaBatteryBonus = 1;
+                p.manaBatteryUntil = 0;
+                p.manaBatterySourceAbilityId = null;
+            }
+        }
+
+        if (!options.isRepeat && p.overchargeCount >= 0) {
+            p.overchargeCount = (p.overchargeCount || 0) + 1;
+            if (p.overchargeCount % 3 === 0) castMult *= 1.5;
+        }
+
+        p.abilityDmgMult = originalAbilityDmgMult * castMult;
+        p.atkMult = originalAtkMult * castMult;
+        if (options.freeCast) ability.cooldown = 0;
+        const used = ability.use(this);
+        p.abilityDmgMult = originalAbilityDmgMult;
+        p.atkMult = originalAtkMult;
+        if (options.freeCast) ability.cooldown = originalCooldown;
+
+        if (used && !options.skipHooks) {
+            this.triggerCardHook('onAbilityCast', {
+                ability,
+                abilityId: ability.abilityId || ability.name || ability.key,
+                isRepeat: !!options.isRepeat
+            });
+        }
+        return used;
+    },
+
+    queueAbilityRepeat(ability, damageMult) {
+        this._queuedAbilityRepeat = { ability, damageMult: Number.isFinite(damageMult) ? damageMult : 0.5 };
+    },
+
+    _resolveQueuedAbilityRepeat() {
+        if (!this._queuedAbilityRepeat) return;
+        const pending = this._queuedAbilityRepeat;
+        this._queuedAbilityRepeat = null;
+        this.castAbility(pending.ability, { freeCast: true, skipHooks: true, isRepeat: true, damageMult: pending.damageMult });
+    },
+
+    getCardShopInventory() {
+        const now = Date.now();
+        const hasInventory = Array.isArray(this.saveData.shopInventoryCardIds) && this.saveData.shopInventoryCardIds.length > 0;
+        if (!hasInventory || !Number.isFinite(this.saveData.shopLastRotatedAt) || now - this.saveData.shopLastRotatedAt >= UpgradeSystem.SHOP_ROTATION_MS) {
+            this.saveData.shopInventoryCardIds = UpgradeSystem.buildShopInventory(this.saveData, 4);
+            this.saveData.shopLastRotatedAt = now;
+            SaveSystem.save(this.saveData);
+        }
+        const cards = this.saveData.shopInventoryCardIds
+            .map(id => UpgradeSystem.cardById(id))
+            .filter(card => !!card);
+        return {
+            cards,
+            remainingMs: Math.max(0, UpgradeSystem.SHOP_ROTATION_MS - (now - (this.saveData.shopLastRotatedAt || now)))
+        };
+    },
+
+    buyCardFromShop(index) {
+        const shop = this.getCardShopInventory();
+        if (index == null || index < 0 || index >= shop.cards.length) return false;
+        const card = shop.cards[index];
+        if (!card) return false;
+        if ((this.saveData.ownedCardIds || []).includes(card.id)) return false;
+        const cost = card.shopCost || UpgradeSystem.getShopCost(card);
+        if (!this.spendCoins(cost, `card_shop_buy_${card.id}`)) return false;
+        if (!(this.saveData.ownedCardIds || []).includes(card.id)) this.saveData.ownedCardIds.push(card.id);
+        if (!Array.isArray(this.saveData.equippedCardIds)) this.saveData.equippedCardIds = [];
+        if (this.saveData.equippedCardIds.length < 24 && !this.saveData.equippedCardIds.includes(card.id)) this.saveData.equippedCardIds.push(card.id);
+        SaveSystem.save(this.saveData);
+        return true;
+    },
+
+    getVisibleCardsForMenu() {
+        const rarityFilter = this.cardsMenuRarityFilter || 'all';
+        const typeFilter = this.cardsMenuTypeFilter || 'all';
+        return UpgradeSystem.allCards().filter(card => {
+            const rarityOk = rarityFilter === 'all' || card.rarity === rarityFilter;
+            const typeOk = typeFilter === 'all' || card.type === typeFilter;
+            return rarityOk && typeOk;
+        });
+    },
+
+    toggleCardEquip(cardId) {
+        if (!this.saveData || !(this.saveData.ownedCardIds || []).includes(cardId)) return false;
+        if (!Array.isArray(this.saveData.equippedCardIds)) this.saveData.equippedCardIds = [];
+        const idx = this.saveData.equippedCardIds.indexOf(cardId);
+        if (idx >= 0) this.saveData.equippedCardIds.splice(idx, 1);
+        else this.saveData.equippedCardIds.push(cardId);
+        SaveSystem.save(this.saveData);
+        return true;
+    },
+
+    cycleCardsRarityFilter() {
+        const values = ['all', 'common', 'rare', 'epic', 'legendary', 'mythic'];
+        const idx = values.indexOf(this.cardsMenuRarityFilter || 'all');
+        this.cardsMenuRarityFilter = values[(idx + 1) % values.length];
+    },
+
+    cycleCardsTypeFilter() {
+        const values = ['all', 'generic', 'ability', 'synergy'];
+        const idx = values.indexOf(this.cardsMenuTypeFilter || 'all');
+        this.cardsMenuTypeFilter = values[(idx + 1) % values.length];
+    },
+
+    _selectedPreset() {
+        if (!Array.isArray(this.saveData.cardPresets)) this.saveData.cardPresets = [];
+        return this.saveData.cardPresets.find(p => p.id === this.saveData.selectedCardPresetId) || null;
+    },
+
+    saveCurrentCardsToPreset() {
+        let preset = this._selectedPreset();
+        if (!preset) {
+            preset = { id: `preset_${Date.now()}`, name: 'Preset', equippedCardIds: [] };
+            this.saveData.cardPresets.push(preset);
+            this.saveData.selectedCardPresetId = preset.id;
+        }
+        preset.equippedCardIds = [...new Set(this.saveData.equippedCardIds || [])];
+        SaveSystem.save(this.saveData);
+    },
+
+    loadSelectedCardPreset() {
+        const preset = this._selectedPreset();
+        if (!preset) return;
+        const owned = new Set(this.saveData.ownedCardIds || []);
+        this.saveData.equippedCardIds = (preset.equippedCardIds || []).filter(id => owned.has(id));
+        SaveSystem.save(this.saveData);
+    },
+
+    renameSelectedCardPreset() {
+        const preset = this._selectedPreset();
+        if (!preset) return;
+        const nextName = window.prompt('Preset name', preset.name || 'Preset');
+        if (!nextName) return;
+        preset.name = nextName.trim() || preset.name;
+        SaveSystem.save(this.saveData);
+    },
+
+    createCardPreset() {
+        const name = window.prompt('New preset name', `Preset ${((this.saveData.cardPresets || []).length + 1)}`) || '';
+        const id = `preset_${Date.now()}`;
+        this.saveData.cardPresets = this.saveData.cardPresets || [];
+        this.saveData.cardPresets.push({ id, name: name.trim() || 'Preset', equippedCardIds: [...new Set(this.saveData.equippedCardIds || [])] });
+        this.saveData.selectedCardPresetId = id;
+        SaveSystem.save(this.saveData);
+    },
+
+    deleteSelectedCardPreset() {
+        if (!Array.isArray(this.saveData.cardPresets) || this.saveData.cardPresets.length <= 1) return;
+        const idx = this.saveData.cardPresets.findIndex(p => p.id === this.saveData.selectedCardPresetId);
+        if (idx < 0) return;
+        this.saveData.cardPresets.splice(idx, 1);
+        this.saveData.selectedCardPresetId = this.saveData.cardPresets[0].id;
+        SaveSystem.save(this.saveData);
+    },
+
+    selectNextCardPreset() {
+        if (!Array.isArray(this.saveData.cardPresets) || this.saveData.cardPresets.length === 0) return;
+        const idx = this.saveData.cardPresets.findIndex(p => p.id === this.saveData.selectedCardPresetId);
+        const next = this.saveData.cardPresets[(idx + 1 + this.saveData.cardPresets.length) % this.saveData.cardPresets.length];
+        this.saveData.selectedCardPresetId = next.id;
+        SaveSystem.save(this.saveData);
     },
 
     _finalizeRunCrystalAccounting(outcome) {
@@ -785,6 +1079,7 @@ const Game = {
         }
 
         if (this.state !== STATES.PLAYING) return;
+        this.runClock += dt;
 
         const p = this.player;
         const room = this.currentRoom;
@@ -816,7 +1111,7 @@ const Game = {
                     if (e.dead) continue;
                     if (pr.distanceTo(e.x, e.y) < e.size + pr.size * 0.5) {
                         const dmg = pr.damage;
-                        e.takeDamage(dmg, 'physical', this);
+                        e.takeDamage(dmg, 'physical', this, { sourcePlayer: this.player, projectile: pr, isAbilityDamage: !!pr.isAbilityProjectile });
                         if (pr.onHit) pr.onHit(e, this);
                         // Knockback
                         e.knockback(pr.x - pr._vx*dt*2, pr.y - pr._vy*dt*2, 80);
@@ -842,7 +1137,12 @@ const Game = {
                             this.killCount++;
                             const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
                             p.gainXp(Math.floor((e.xpReward || 0) * (dungeon.xpMultiplier || 1)), this);
-                            this.coins += Math.floor((e.coinReward || 0) * (dungeon.coinMultiplier || 1));
+                            let coinAmount = Math.floor((e.coinReward || 0) * (dungeon.coinMultiplier || 1));
+                            if (e.isElite) coinAmount += 4;
+                            if (e.isMiniBoss) coinAmount += 20;
+                            if (e.isBoss) coinAmount += 35;
+                            this.addCoins(coinAmount, `enemy_kill_${e.type}`);
+                            this.triggerCardHook('onEnemyKilled', { enemy: e });
                             // Crystal drop
                             if (Math.random() < 0.08 + (e.crystalChance || 0) + (dungeon.crystalDropBonus || 0)) {
                                 this.addCrystals(1, 'enemy_crystal_drop');
@@ -856,7 +1156,7 @@ const Game = {
             } else if (pr.owner === 'enemy') {
                 // Check hit on player
                 if (!p.invincible && pr.distanceTo(p.x, p.y) < 24 + pr.size * 0.5) {
-                    p.takeDamage(pr.damage, this);
+                    p.takeDamage(pr.damage, { sourceType: 'enemy' }, this);
                     pr.dead = true;
                 }
             }
@@ -913,7 +1213,8 @@ const Game = {
             this.currentRoom.openDoor();
             // Bonus coin drop
             const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
-            this.coins += Math.floor((1 + Math.floor(this.roomIndex * 0.5)) * (dungeon.coinMultiplier || 1));
+            this.addCoins(Math.floor((1 + Math.floor(this.roomIndex * 0.5)) * (dungeon.coinMultiplier || 1)), `room_clear_${this.roomIndex + 1}`, { silent: true });
+            this.triggerCardHook('onRoomClear', { roomIndex: this.roomIndex, roomDuration: (this.runClock || 0) - (this.currentRoomStartedAt || 0) });
         }
 
         // Check portal entry
@@ -939,7 +1240,7 @@ const Game = {
                         this.addDamageNumber(ch.x, ch.y - 30, 25, '#44ff88');
                     } else if (roll < 0.7) {
                         const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
-                        this.coins += Math.floor((3 + Math.floor(Math.random() * 4)) * (dungeon.coinMultiplier || 1));
+                        this.addCoins(Math.floor((3 + Math.floor(Math.random() * 4)) * (dungeon.coinMultiplier || 1)), 'chest_coin_reward');
                     } else {
                         const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
                         const crystalAmount = dungeon.id === 'dungeon2' ? 2 : 1;
@@ -959,6 +1260,8 @@ const Game = {
                 if (Math.random() < dt * 0.5) p.applyEffect('poison');
             }
         }
+
+        this._resolveQueuedAbilityRepeat();
     },
 
     _render() {
@@ -996,6 +1299,12 @@ const Game = {
             case STATES.HELP:
                 UI.renderHelp(ctx);
                 break;
+            case STATES.CARDS:
+                UI.renderCardsMenu(ctx, this.saveData, this.getVisibleCardsForMenu(), this.hoverCardMenuItem, this.cardsMenuRarityFilter, this.cardsMenuTypeFilter);
+                break;
+            case STATES.CARD_SHOP:
+                UI.renderCardShop(ctx, this.saveData, this.getCardShopInventory(), this.hoverCardShopItem);
+                break;
             case STATES.PLAYING:
             case STATES.LEVELUP:
             case STATES.PAUSED:
@@ -1010,7 +1319,7 @@ const Game = {
             case STATES.VICTORY:
                 UI.renderVictory(ctx, this);
                 break;
-            case STATES.SHOP:
+            case STATES.PERMANENT_SHOP:
                 UI.renderShop(ctx, this.saveData, this.hoverShopItem, this.selectedShopCategory, this.hoverShopTab);
                 break;
             case STATES.SETTINGS:

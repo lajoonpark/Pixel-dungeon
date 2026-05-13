@@ -31,7 +31,7 @@ const Assets = {
         'tile_door','tile_spike','tile_poison_puddle','tile_lava_crack','tile_corruption_puddle','tile_ritual_rune','tile_crystal_wall',
         // Original ability icons
         'icon_fireball','icon_dash','icon_nova',
-        'icon_coin','icon_crystal','icon_heart','icon_xp',
+        'icon_coin','icon_coins','icon_crystal','icon_heart','icon_xp',
         // New ability icons
         'icon_quick_slash','icon_dash_strike',
         'icon_fireball_shot','icon_flame_dash',
@@ -52,6 +52,13 @@ const Assets = {
         'passive_dragon_knight','passive_void_assassin','passive_chronomancer',
         // Rarity frames
         'frame_common','frame_rare','frame_epic','frame_legendary','frame_mythic',
+        // Cards/shop ui
+        'card_back','icon_cards_menu','icon_shop_menu','icon_preset','icon_lock','icon_equipped',
+        'card_steady_aim','card_thick_boots','card_small_snack','card_coin_pouch','card_calm_focus',
+        'card_finishing_blow','card_emergency_roll','card_treasure_sense','card_battle_rhythm','card_mana_battery',
+        'card_execution_chain','card_crystal_skin','card_overcharge','card_hunters_mark','card_room_momentum',
+        'card_second_wind','card_storm_of_blades','card_unstable_power','card_boss_hunter',
+        'card_reality_fracture','card_golden_curse',
         // Effects
         'effect_fireball','effect_explosion','effect_freeze',
         'effect_poison','effect_burn','effect_shock','effect_dash_trail','effect_corruption',
@@ -122,8 +129,14 @@ const Assets = {
         tile_door:'#7a4c1e', tile_spike:'#888888', tile_corruption_puddle:'#7c2fb7',
         tile_ritual_rune:'#c86cff', tile_crystal_wall:'#b48cff',
         icon_fireball:'#ff8800', icon_dash:'#4488ff',
-        icon_nova:'#88ccff', icon_coin:'#ffcc00',
+        icon_nova:'#88ccff', icon_coin:'#ffcc00', icon_coins:'#ffcc00',
         icon_crystal:'#9933cc', icon_heart:'#dd2244', icon_xp:'#44cc44',
+        card_back:'#555066', icon_cards_menu:'#99a8ff', icon_shop_menu:'#e1bf74', icon_preset:'#9fd9aa', icon_lock:'#b96f7d', icon_equipped:'#88d88a',
+        card_steady_aim:'#8bb6ff', card_thick_boots:'#8f8270', card_small_snack:'#c8a66f', card_coin_pouch:'#d6b248', card_calm_focus:'#9ca8da',
+        card_finishing_blow:'#d98a80', card_emergency_roll:'#8ebad3', card_treasure_sense:'#e2c977', card_battle_rhythm:'#d78f68', card_mana_battery:'#8d95db',
+        card_execution_chain:'#dd8d8d', card_crystal_skin:'#9ec4f1', card_overcharge:'#d6a0ff', card_hunters_mark:'#8ccf8c', card_room_momentum:'#9dd3b2',
+        card_second_wind:'#f0c28e', card_storm_of_blades:'#c4b5ff', card_unstable_power:'#f08a88', card_boss_hunter:'#f0a85f',
+        card_reality_fracture:'#cc99ff', card_golden_curse:'#e5bf59',
         chest:'#885522', portal:'#8833cc', xp_gem:'#44bb55',
         shopkeeper:'#aa8844', effect_corruption:'#a54dff',
         icon_dungeon_crypt:'#6a5c82', icon_dungeon_corrupted:'#8b3bd1',

@@ -1,4 +1,15 @@
 'use strict';
+const CARD_RARITY_SHOP_WEIGHTS = { common: 55, rare: 25, epic: 13, legendary: 5, mythic: 2 };
+const CARD_SHOP_COSTS = { common: 50, rare: 120, epic: 300, legendary: 750, mythic: 1500 };
+
+const STARTING_OWNED_CARD_IDS = [
+    'damage', 'attackspeed', 'range', 'speed', 'maxhp',
+    'quickSlashDamage', 'quickSlashRadius', 'quickSlashCooldown',
+    'dashStrikeDistance', 'dashStrikeDamage', 'dashStrikeCooldown'
+];
+
+const DEFAULT_EQUIPPED_CARD_IDS = [...STARTING_OWNED_CARD_IDS];
+
 const UPGRADES = [
     // Physical
     { id:'damage',       name:'+25% Attack Damage',    desc:'Deal 25% more damage with basic attacks.',  rarity:'common',  tags:['physical'], icon:'upgrade_damage', type:'generic', apply(p){ p.atkMult *= 1.25; } },
@@ -44,7 +55,140 @@ const UPGRADES = [
     // On-hit effects
     { id:'onhit_burn',   name:'Burning Strikes',       desc:'Attacks have 30% chance to Burn.',         rarity:'rare',    tags:['physical','elemental'], icon:'upgrade_fireball', type:'generic', apply(p){ p.onHitBurnChance = (p.onHitBurnChance||0)+0.3; } },
     { id:'onhit_poison', name:'Poison Strikes',        desc:'Attacks have 30% chance to Poison.',       rarity:'rare',    tags:['physical','elemental'], icon:'upgrade_nova', type:'generic', apply(p){ p.onHitPoisonChance = (p.onHitPoisonChance||0)+0.3; } },
+
+    // New common cards
+    { id:'steadyAim', name:'Steady Aim', desc:'Basic attacks travel 20% faster.', rarity:'common', tags:['physical','projectile'], icon:'card_steady_aim', type:'generic', apply(p){ p.basicProjectileSpeedMult = (p.basicProjectileSpeedMult || 1) * 1.2; } },
+    { id:'thickBoots', name:'Thick Boots', desc:'Take 20% less hazard damage.', rarity:'common', tags:['survival','hazard'], icon:'card_thick_boots', type:'generic', apply(p){ p.hazardDamageTakenMult = (p.hazardDamageTakenMult || 1) * 0.8; } },
+    { id:'smallSnack', name:'Small Snack', desc:'Heal 8 HP after clearing each room.', rarity:'common', tags:['survival','room'], icon:'card_small_snack', type:'generic',
+        onRoomClear(player) { player.hp = Math.min(player.maxHp, player.hp + 8); }
+    },
+    { id:'coinPouch', name:'Coin Pouch', desc:'Gain 15% more coins from enemy kills.', rarity:'common', tags:['economy'], icon:'card_coin_pouch', type:'generic', apply(p){ p.enemyCoinGainMult = (p.enemyCoinGainMult || 1) * 1.15; } },
+    { id:'calmFocus', name:'Calm Focus', desc:'Abilities cooldown 8% faster.', rarity:'common', tags:['ability','cooldown'], icon:'card_calm_focus', type:'generic', apply(p){ p.abilityCooldownMult = (p.abilityCooldownMult || 1) * 0.92; } },
+
+    // New rare cards
+    { id:'finishingBlow', name:'Finishing Blow', desc:'+30% damage to enemies below 30% HP.', rarity:'rare', tags:['damage'], icon:'card_finishing_blow', type:'generic', apply(p){ p.lowHpDamageMult = (p.lowHpDamageMult || 1) * 1.3; } },
+    { id:'emergencyRoll', name:'Emergency Roll', desc:'After a heavy hit, gain +25% dodge for 2s (12s cooldown).', rarity:'rare', tags:['defense','dodge'], icon:'card_emergency_roll', type:'generic',
+        onPlayerDamaged(player, game, ctx) {
+            const now = game.runClock || 0;
+            const threshold = player.maxHp * 0.2;
+            if ((ctx.damageApplied || 0) >= threshold && now >= (player.emergencyRollReadyAt || 0)) {
+                player.tempDodgeBonus = Math.max(player.tempDodgeBonus || 0, 0.25);
+                player.tempDodgeUntil = now + 2;
+                player.emergencyRollReadyAt = now + 12;
+            }
+        }
+    },
+    { id:'treasureSense', name:'Treasure Sense', desc:'20% chance for extra room clear rewards.', rarity:'rare', tags:['economy','room'], icon:'card_treasure_sense', type:'generic',
+        onRoomClear(player, game) {
+            if (Math.random() < 0.2) {
+                game.addCoins(5 + Math.floor(Math.random() * 5), 'treasure_sense_bonus');
+                player.hp = Math.min(player.maxHp, player.hp + 4);
+            }
+        }
+    },
+    { id:'battleRhythm', name:'Battle Rhythm', desc:'After a kill, gain +20% attack speed for 3s.', rarity:'rare', tags:['physical','tempo'], icon:'card_battle_rhythm', type:'generic',
+        onEnemyKilled(player, game) {
+            player.battleRhythmUntil = (game.runClock || 0) + 3;
+        }
+    },
+    { id:'manaBattery', name:'Mana Battery', desc:'Casting an ability buffs the next different one by 20%.', rarity:'rare', tags:['ability','damage'], icon:'card_mana_battery', type:'generic',
+        onAbilityCast(player, game, ctx) {
+            if (ctx && ctx.abilityId) {
+                player.manaBatteryBonus = 1.2;
+                player.manaBatterySourceAbilityId = ctx.abilityId;
+                player.manaBatteryUntil = (game.runClock || 0) + 4;
+            }
+        }
+    },
+
+    // New epic cards
+    { id:'executionChain', name:'Execution Chain', desc:'On kill, deal 25% of that enemy max HP nearby.', rarity:'epic', tags:['ability','aoe'], icon:'card_execution_chain', type:'generic',
+        onEnemyKilled(player, game, ctx) {
+            if (!ctx || !ctx.enemy) return;
+            const enemy = ctx.enemy;
+            const aoeDamage = (enemy.maxHp || 0) * 0.25;
+            const radius = 100;
+            for (const target of game.enemies) {
+                if (target.dead || target === enemy) continue;
+                const dx = target.x - enemy.x;
+                const dy = target.y - enemy.y;
+                if (dx * dx + dy * dy <= radius * radius) {
+                    target.takeDamage(aoeDamage, 'physical', game, { sourcePlayer: player, isAbilityDamage: true });
+                }
+            }
+            spawnExplosion(game.particles, enemy.x, enemy.y, 10, ['#ff9999', '#ffcc99', '#ffffff'], 120, 5);
+        }
+    },
+    { id:'crystalSkin', name:'Crystal Skin', desc:'Start each room with shield equal to 20% max HP.', rarity:'epic', tags:['defense','shield'], icon:'card_crystal_skin', type:'generic',
+        onRoomStart(player) {
+            player.tempShield = Math.max(player.tempShield || 0, Math.floor(player.maxHp * 0.2));
+        }
+    },
+    { id:'overcharge', name:'Overcharge', desc:'Every 3rd ability cast is empowered.', rarity:'epic', tags:['ability','damage'], icon:'card_overcharge', type:'generic', apply(p){ p.overchargeCount = 0; } },
+    { id:'huntersMark', name:'Hunter’s Mark', desc:'Basic attacks mark enemies; abilities deal +15% to marked foes.', rarity:'epic', tags:['physical','ability'], icon:'card_hunters_mark', type:'generic', apply(p){ p.huntersMarkEnabled = true; } },
+    { id:'roomMomentum', name:'Room Momentum', desc:'Clear rooms fast for bonus coins and healing.', rarity:'epic', tags:['economy','room'], icon:'card_room_momentum', type:'generic',
+        onRoomClear(player, game, ctx) {
+            if (!ctx || !ctx.roomDuration || ctx.roomDuration > 35) return;
+            game.addCoins(8 + Math.floor(Math.random() * 5), 'room_momentum_bonus');
+            player.hp = Math.min(player.maxHp, player.hp + 6);
+        }
+    },
+
+    // New legendary cards
+    { id:'secondWind', name:'Second Wind', desc:'Avoid death once per run and recover 40% max HP.', rarity:'legendary', tags:['defense','revive'], icon:'card_second_wind', type:'generic',
+        onRunStart(player) { player.secondWindUsed = false; },
+        onBeforeDamage(player, game, ctx) {
+            if (player.secondWindUsed) return;
+            if (player.hp - ctx.amount <= 0) {
+                player.secondWindUsed = true;
+                ctx.amount = Math.max(0, player.hp - 1);
+                ctx.triggerSecondWind = true;
+            }
+        },
+        onPlayerDamaged(player, game, ctx) {
+            if (!ctx.triggerSecondWind) return;
+            player.hp = Math.min(player.maxHp, Math.floor(player.maxHp * 0.4));
+            for (const e of game.enemies) {
+                if (!e.dead) e.knockback(player.x, player.y, 220);
+            }
+            spawnExplosion(game.particles, player.x, player.y, 16, ['#ffeeaa', '#ffffff', '#99ddff'], 160, 7);
+        }
+    },
+    { id:'stormOfBlades', name:'Storm of Blades', desc:'15% chance on basic attack to fire 3 extra blades.', rarity:'legendary', tags:['physical','projectile'], icon:'card_storm_of_blades', type:'generic', apply(p){ p.stormOfBladesChance = (p.stormOfBladesChance || 0) + 0.15; } },
+    { id:'unstablePower', name:'Unstable Power', desc:'+35% ability damage, but abilities cost 2% current HP.', rarity:'legendary', tags:['ability','risk'], icon:'card_unstable_power', type:'generic',
+        apply(p){ p.abilityDmgMult = (p.abilityDmgMult || 1) * 1.35; },
+        onAbilityCast(player) {
+            const hpCost = Math.max(1, player.hp * 0.02);
+            player.hp = Math.max(1, player.hp - hpCost);
+        }
+    },
+    { id:'bossHunter', name:'Boss Hunter', desc:'+25% damage to elites, mini bosses, and bosses.', rarity:'legendary', tags:['damage','boss'], icon:'card_boss_hunter', type:'generic', apply(p){ p.bossDamageMult = (p.bossDamageMult || 1) * 1.25; } },
+
+    // New mythical cards
+    { id:'realityFracture', name:'Reality Fracture', desc:'20% chance to repeat your last ability at 50% power.', rarity:'mythic', tags:['ability','mythic'], icon:'card_reality_fracture', type:'generic',
+        onAbilityCast(player, game, ctx) {
+            if (!ctx || ctx.isRepeat) return;
+            if (Math.random() < 0.2 && ctx.ability) {
+                game.queueAbilityRepeat(ctx.ability, 0.5);
+            }
+        }
+    },
+    { id:'goldenCurse', name:'Golden Curse', desc:'+75% coins from kills, but enemies deal +15% damage.', rarity:'mythic', tags:['economy','curse'], icon:'card_golden_curse', type:'generic',
+        apply(p) {
+            p.enemyCoinGainMult = (p.enemyCoinGainMult || 1) * 1.75;
+            p.enemyDamageTakenMult = (p.enemyDamageTakenMult || 1) * 1.15;
+        }
+    },
 ];
+
+for (const card of UPGRADES) {
+    if (!Array.isArray(card.tags)) card.tags = [];
+    if (!card.type) card.type = 'generic';
+    if (!card.description) card.description = card.desc || '';
+    if (!card.desc) card.desc = card.description;
+    if (!card.icon) card.icon = 'card_back';
+    card.shopCost = CARD_SHOP_COSTS[card.rarity] || 50;
+}
 
 const PERMANENT_COSTS = [3, 7, 13, 19, 26];
 const MAX_DODGE_CHANCE = 0.5;
@@ -215,6 +359,26 @@ const PERMANENT_UPGRADES = Object.values(permanentUpgradeCategories).flat().map(
 }));
 
 const UpgradeSystem = {
+    STARTING_OWNED_CARD_IDS,
+    DEFAULT_EQUIPPED_CARD_IDS,
+    SHOP_ROTATION_MS: 5 * 60 * 1000,
+
+    allCards() {
+        return UPGRADES;
+    },
+
+    starterOwnedCardIds() {
+        return [...STARTING_OWNED_CARD_IDS];
+    },
+
+    defaultEquippedCardIds() {
+        return [...DEFAULT_EQUIPPED_CARD_IDS];
+    },
+
+    cardById(id) {
+        return UPGRADES.find(c => c.id === id) || null;
+    },
+
     _classContext(player) {
         const classDef = player && player.classDef ? player.classDef : null;
         const classId = classDef ? classDef.id : null;
@@ -262,27 +426,90 @@ const UpgradeSystem = {
         return true;
     },
 
-    // Pick 3 random upgrades from the pool, weighted by rarity
-    roll(player, count = 3) {
-        const pool = UPGRADES.filter(u => this.isUpgradeAllowed(player, u));
+    normalizeOwnedAndEquipped(saveData) {
+        if (!saveData) return;
+        if (!Array.isArray(saveData.ownedCardIds) || saveData.ownedCardIds.length === 0) {
+            saveData.ownedCardIds = this.starterOwnedCardIds();
+        }
+        if (!Array.isArray(saveData.equippedCardIds) || saveData.equippedCardIds.length === 0) {
+            saveData.equippedCardIds = this.defaultEquippedCardIds();
+        }
+        const owned = new Set(saveData.ownedCardIds.filter(id => !!this.cardById(id)));
+        saveData.ownedCardIds = [...owned];
+        saveData.equippedCardIds = saveData.equippedCardIds.filter(id => owned.has(id) && !!this.cardById(id));
+        if (saveData.equippedCardIds.length === 0) {
+            saveData.equippedCardIds = this.defaultEquippedCardIds().filter(id => owned.has(id));
+        }
+    },
+
+    getOwnedCards(saveData) {
+        const ownedSet = new Set((saveData && saveData.ownedCardIds) || []);
+        return UPGRADES.filter(c => ownedSet.has(c.id));
+    },
+
+    getEquippedCards(saveData) {
+        const equippedSet = new Set((saveData && saveData.equippedCardIds) || []);
+        return UPGRADES.filter(c => equippedSet.has(c.id));
+    },
+
+    getShopCost(card) {
+        return CARD_SHOP_COSTS[(card && card.rarity) || 'common'] || 50;
+    },
+
+    _weightedCardChoice(cards) {
+        if (!cards || cards.length === 0) return null;
+        const totalWeight = cards.reduce((sum, c) => sum + (CARD_RARITY_SHOP_WEIGHTS[c.rarity] || 1), 0);
+        let roll = Math.random() * totalWeight;
+        for (const card of cards) {
+            roll -= (CARD_RARITY_SHOP_WEIGHTS[card.rarity] || 1);
+            if (roll <= 0) return card;
+        }
+        return cards[cards.length - 1];
+    },
+
+    buildShopInventory(saveData, count = 4) {
+        const owned = new Set((saveData && saveData.ownedCardIds) || []);
+        const pool = UPGRADES.filter(card => !owned.has(card.id));
+        if (pool.length === 0) return [];
+        const selected = [];
+        const remaining = [...pool];
+        while (selected.length < count && remaining.length > 0) {
+            const choice = this._weightedCardChoice(remaining);
+            if (!choice) break;
+            selected.push(choice.id);
+            const idx = remaining.findIndex(c => c.id === choice.id);
+            if (idx >= 0) remaining.splice(idx, 1);
+        }
+        return selected;
+    },
+
+    getDungeonCardPool(player, saveData) {
+        const owned = new Set((saveData && saveData.ownedCardIds) || []);
+        const equipped = new Set((saveData && saveData.equippedCardIds) || []);
+        let pool = UPGRADES.filter(card => owned.has(card.id) && equipped.has(card.id) && this.isUpgradeAllowed(player, card));
+        if (pool.length === 0) {
+            const starter = new Set(this.starterOwnedCardIds());
+            pool = UPGRADES.filter(card => starter.has(card.id) && owned.has(card.id) && this.isUpgradeAllowed(player, card));
+        }
+        if (pool.length === 0) {
+            pool = UPGRADES.filter(card => this.isUpgradeAllowed(player, card));
+        }
+        return pool;
+    },
+
+    // Pick random equipped/owned cards from dungeon pool (equal rarity weight in-run)
+    roll(player, saveData, count = 3) {
+        const pool = this.getDungeonCardPool(player, saveData);
         const chosen = [];
         const used = new Set();
 
-        // Weight by rarity
-        const weight = (u) => ({ common:3, rare:1.5, epic:0.7 })[u.rarity] || 1;
-
         while (chosen.length < count && pool.length > 0) {
-            let totalW = pool.filter(u => !used.has(u.id)).reduce((s, u) => s + weight(u), 0);
-            let r = Math.random() * totalW;
-            for (const u of pool) {
-                if (used.has(u.id)) continue;
-                r -= weight(u);
-                if (r <= 0) {
-                    chosen.push(u);
-                    used.add(u.id);
-                    break;
-                }
-            }
+            const candidates = pool.filter(u => !used.has(u.id));
+            if (candidates.length === 0) break;
+            const idx = Math.floor(Math.random() * candidates.length);
+            const choice = candidates[idx];
+            chosen.push(choice);
+            used.add(choice.id);
         }
         return chosen;
     },

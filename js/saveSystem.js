@@ -1,8 +1,17 @@
 'use strict';
+const SAVE_STARTING_OWNED_CARD_IDS = [
+    'damage', 'attackspeed', 'range', 'speed', 'maxhp',
+    'quickSlashDamage', 'quickSlashRadius', 'quickSlashCooldown',
+    'dashStrikeDistance', 'dashStrikeDamage', 'dashStrikeCooldown'
+];
+
+const SAVE_DEFAULT_CARD_PRESET_ID = 'default';
+
 const SaveSystem = {
     KEY: 'pixelDungeon_v1',
     defaultSave: {
         crystals: 0,
+        coins: 0,
         permanentUpgrades: {},
         bestRun: { floor: 0, kills: 0, crystals: 0 },
         bestRunsByDungeon: {},
@@ -17,6 +26,12 @@ const SaveSystem = {
         rollCount: 0,
         rollCost: 10,
         classShards: {},
+        ownedCardIds: [...SAVE_STARTING_OWNED_CARD_IDS],
+        equippedCardIds: [...SAVE_STARTING_OWNED_CARD_IDS],
+        cardPresets: [{ id: SAVE_DEFAULT_CARD_PRESET_ID, name: 'Default', equippedCardIds: [...SAVE_STARTING_OWNED_CARD_IDS] }],
+        selectedCardPresetId: SAVE_DEFAULT_CARD_PRESET_ID,
+        shopInventoryCardIds: [],
+        shopLastRotatedAt: 0
     },
 
     load() {
@@ -46,6 +61,7 @@ const SaveSystem = {
 
     _migrateSave(save) {
         if (!save || typeof save !== 'object') return;
+        if (!Number.isFinite(save.coins) || save.coins < 0) save.coins = 0;
         if (!save.permanentUpgrades || typeof save.permanentUpgrades !== 'object') {
             save.permanentUpgrades = {};
         }
@@ -59,6 +75,42 @@ const SaveSystem = {
             if (key in save.permanentUpgrades) delete save.permanentUpgrades[key];
         }
         save.permanentUpgrades.p_crystal = Math.max(0, Math.min(5, migrated | 0));
+
+        if (!Array.isArray(save.ownedCardIds) || save.ownedCardIds.length === 0) {
+            save.ownedCardIds = [...SAVE_STARTING_OWNED_CARD_IDS];
+        }
+        if (!Array.isArray(save.equippedCardIds) || save.equippedCardIds.length === 0) {
+            save.equippedCardIds = [...SAVE_STARTING_OWNED_CARD_IDS];
+        }
+        const ownedSet = new Set(save.ownedCardIds.map(String));
+        save.ownedCardIds = [...ownedSet];
+        save.equippedCardIds = save.equippedCardIds.map(String).filter(id => ownedSet.has(id));
+        if (save.equippedCardIds.length === 0) {
+            save.equippedCardIds = [...SAVE_STARTING_OWNED_CARD_IDS].filter(id => ownedSet.has(id));
+        }
+
+        if (!Array.isArray(save.cardPresets) || save.cardPresets.length === 0) {
+            save.cardPresets = [{ id: SAVE_DEFAULT_CARD_PRESET_ID, name: 'Default', equippedCardIds: [...save.equippedCardIds] }];
+        } else {
+            save.cardPresets = save.cardPresets
+                .filter(preset => preset && preset.id)
+                .map(preset => ({
+                    id: String(preset.id),
+                    name: preset.name ? String(preset.name) : 'Preset',
+                    equippedCardIds: Array.isArray(preset.equippedCardIds)
+                        ? preset.equippedCardIds.map(String).filter(id => ownedSet.has(id))
+                        : []
+                }));
+            if (save.cardPresets.length === 0) {
+                save.cardPresets = [{ id: SAVE_DEFAULT_CARD_PRESET_ID, name: 'Default', equippedCardIds: [...save.equippedCardIds] }];
+            }
+        }
+
+        if (!save.selectedCardPresetId || !save.cardPresets.some(p => p.id === save.selectedCardPresetId)) {
+            save.selectedCardPresetId = save.cardPresets[0].id;
+        }
+        if (!Array.isArray(save.shopInventoryCardIds)) save.shopInventoryCardIds = [];
+        if (!Number.isFinite(save.shopLastRotatedAt)) save.shopLastRotatedAt = 0;
     },
 
     _deep(obj) { return JSON.parse(JSON.stringify(obj)); }

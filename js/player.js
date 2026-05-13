@@ -34,7 +34,18 @@ class Player {
         this.burnDurationMult    = 1;
         this.critDmgBonus        = 0;
         this.damageTakenMult     = 1;
+        this.enemyDamageTakenMult = 1;
         this.dodgeChance         = 0;
+        this.hazardDamageTakenMult = 1;
+        this.enemyCoinGainMult = 1;
+        this.basicProjectileSpeedMult = 1;
+        this.lowHpDamageMult = 1;
+        this.bossDamageMult = 1;
+        this.tempShield = 0;
+        this.tempDodgeBonus = 0;
+        this.tempDodgeUntil = 0;
+        this.battleRhythmUntil = 0;
+        this.stormOfBladesChance = 0;
 
         // Auto-attack state
         this.atkCooldown   = 0;
@@ -104,7 +115,8 @@ class Player {
     }
 
     get atkInterval() {
-        return this.baseAtkSpeed / this.atkSpeedMult;
+        const tempo = this.battleRhythmActive ? 1.2 : 1;
+        return this.baseAtkSpeed / (this.atkSpeedMult * tempo);
     }
 
     /** Find the dash ability by isDash flag */
@@ -124,8 +136,15 @@ class Player {
         const game = (gameArg && typeof gameArg === 'object')
             ? gameArg
             : ((sourceOrContext && typeof sourceOrContext === 'object') ? sourceOrContext : null);
+        const context = (sourceOrContext && typeof sourceOrContext === 'object' && sourceOrContext !== game)
+            ? sourceOrContext
+            : {};
 
-        const dodgeChance = Math.min(PLAYER_MAX_DODGE_CHANCE, Math.max(0, this.dodgeChance || 0));
+        const now = game ? (game.runClock || 0) : 0;
+        this.battleRhythmActive = now <= (this.battleRhythmUntil || 0);
+        if (this.tempDodgeUntil && now > this.tempDodgeUntil) this.tempDodgeBonus = 0;
+
+        const dodgeChance = Math.min(PLAYER_MAX_DODGE_CHANCE, Math.max(0, (this.dodgeChance || 0) + (this.tempDodgeBonus || 0)));
         if (dodgeChance > 0 && Math.random() < dodgeChance) {
             if (game && typeof game.addDamageNumber === 'function') {
                 game.addDamageNumber(this.x, this.y - 40, 0, '#88ddff', { text: 'DODGE', big: true, role: 'player' });
@@ -134,15 +153,28 @@ class Player {
         }
 
         amount = Number.isFinite(amount) ? amount : 0;
+        const damageCtx = { amount, sourceType: context.sourceType || 'enemy', isHazard: !!context.isHazard };
+        if (game && typeof game.triggerCardHook === 'function') game.triggerCardHook('onBeforeDamage', damageCtx);
+        amount = damageCtx.amount;
+
+        if (damageCtx.isHazard) amount *= (this.hazardDamageTakenMult || 1);
+        if (damageCtx.sourceType === 'enemy') amount *= (this.enemyDamageTakenMult || 1);
         amount *= (this.damageTakenMult || 1);
         if (this._frostArmor) amount *= 0.6; // Frost Armor: 40% damage reduction
-        this.hp = Math.max(0, this.hp - amount);
+        let remaining = amount;
+        if ((this.tempShield || 0) > 0) {
+            const absorbed = Math.min(this.tempShield, remaining);
+            this.tempShield -= absorbed;
+            remaining -= absorbed;
+        }
+        this.hp = Math.max(0, this.hp - remaining);
         this.hitFlash = 0.25;
         this.invincible = true;
         this.invincibleTimer = 0.6;
         if (game && typeof game.addDamageNumber === 'function') {
-            game.addDamageNumber(this.x, this.y - 40, Math.ceil(amount), '#ff4444', { role: 'player' });
+            game.addDamageNumber(this.x, this.y - 40, Math.ceil(remaining), '#ff4444', { role: 'player' });
         }
+        if (game && typeof game.triggerCardHook === 'function') game.triggerCardHook('onPlayerDamaged', { amountRequested: amount, damageApplied: remaining, triggerSecondWind: damageCtx.triggerSecondWind });
         if (this.hp <= 0 && game && typeof game.gameOver === 'function') game.gameOver();
     }
 
@@ -157,6 +189,8 @@ class Player {
     }
 
     update(dt, game) {
+        this.battleRhythmActive = (game.runClock || 0) <= (this.battleRhythmUntil || 0);
+        if (this.tempDodgeUntil && (game.runClock || 0) > this.tempDodgeUntil) this.tempDodgeBonus = 0;
         // Invincibility frames
         if (this.invincible) {
             this.invincibleTimer -= dt;
@@ -231,13 +265,13 @@ class Player {
             if (tileType === TILE.SPIKE) {
                 if (!this._spikeTimer) this._spikeTimer = 0;
                 this._spikeTimer += dt;
-                if (this._spikeTimer > 0.5) { this._spikeTimer = 0; this.takeDamage(8, game); }
+                if (this._spikeTimer > 0.5) { this._spikeTimer = 0; this.takeDamage(8, { sourceType: 'hazard', isHazard: true }, game); }
             } else if (tileType === TILE.POISON) {
                 this.applyEffect('poison');
             } else if (tileType === TILE.CORRUPTION) {
                 if (!this._corruptionTimer) this._corruptionTimer = 0;
                 this._corruptionTimer += dt;
-                if (this._corruptionTimer > 0.35) { this._corruptionTimer = 0; this.takeDamage(6, game); }
+                if (this._corruptionTimer > 0.35) { this._corruptionTimer = 0; this.takeDamage(6, { sourceType: 'hazard', isHazard: true }, game); }
                 this.applyEffect('slow');
             } else if (tileType === TILE.RUNE) {
                 this.applyEffect('slow');
@@ -245,7 +279,7 @@ class Player {
                 this.applyEffect('slow');
                 if (!this._crystalTick) this._crystalTick = 0;
                 this._crystalTick += dt;
-                if (this._crystalTick > 0.7) { this._crystalTick = 0; this.takeDamage(4, game); }
+                if (this._crystalTick > 0.7) { this._crystalTick = 0; this.takeDamage(4, { sourceType: 'hazard', isHazard: true }, game); }
             }
         }
 
@@ -287,7 +321,7 @@ class Player {
                 this.chronoRepeatTimer = 0;
                 // Auto-use first available non-dash ability
                 const ab = this.abilities.find(a => !a.isDash && typeof a.canUse === 'function' && a.canUse());
-                if (ab) ab.use(game);
+                if (ab && typeof game.castAbility === 'function') game.castAbility(ab);
             }
         }
     }
@@ -318,13 +352,15 @@ class Player {
             x: this.x, y: this.y,
             tx: target.x, ty: target.y,
             target, homing: true,
-            speed: 420, damage: dmg,
+            speed: 420 * (this.basicProjectileSpeedMult || 1), damage: dmg,
             size: 10, type: 'arrow',
             color: isCrit ? '#ffff44' : '#ffcc44',
             glowColor: isCrit ? '#ffff00' : null,
             owner: 'player',
+            isBasicAttack: true,
             maxLife: 2,
             onHit: (enemy, gm) => {
+                if (this.huntersMarkEnabled) enemy.markedUntil = (gm.runClock || 0) + 4;
                 if (this.lifeSteal > 0) {
                     this.hp = Math.min(this.maxHp, this.hp + dmg * this.lifeSteal);
                 }
@@ -345,6 +381,25 @@ class Player {
             }
         });
         game.projectiles.push(proj);
+        if ((this.stormOfBladesChance || 0) > 0 && Math.random() < this.stormOfBladesChance) {
+            const baseAngle = Math.atan2(target.y - this.y, target.x - this.x);
+            for (let i = -1; i <= 1; i++) {
+                const a = baseAngle + i * 0.2;
+                game.projectiles.push(new Projectile({
+                    x: this.x,
+                    y: this.y,
+                    tx: this.x + Math.cos(a) * 420,
+                    ty: this.y + Math.sin(a) * 420,
+                    speed: 380,
+                    damage: dmg * 0.35,
+                    size: 7,
+                    type: 'arrow',
+                    owner: 'player',
+                    maxLife: 1.4,
+                    isBasicAttack: false
+                }));
+            }
+        }
     }
 
     render(ctx) {
