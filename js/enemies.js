@@ -2,6 +2,7 @@
 
 // Elite modifiers extend base enemies with additional effects while preserving existing AI architecture.
 const ELITE_MODIFIERS = ['burning', 'toxic', 'vampiric', 'frenzied', 'shielded', 'arcane', 'explosive', 'regenerating'];
+const rollCoinReward = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
 const ELITE_AURA_COLORS = {
     burning: '#ff7a1a',
     toxic: '#63d84d',
@@ -79,7 +80,7 @@ class Enemy {
         }
         this.size *= 1.1;
         this.xpReward = Math.floor(this.xpReward * 1.3);
-        this.coinReward += 1;
+        this.coinReward += 3;
     }
 
     _incomingDamageMultiplier() {
@@ -90,10 +91,22 @@ class Enemy {
 
     takeDamage(amount, type, game, options) {
         amount = Number.isFinite(amount) ? amount : 0;
+        const opts = (options && typeof options === 'object') ? options : {};
+        const sourcePlayer = opts.sourcePlayer || (game && game.player) || null;
+        if (sourcePlayer) {
+            if ((sourcePlayer.lowHpDamageMult || 1) > 1 && this.maxHp > 0 && (this.hp / this.maxHp) < 0.3) {
+                amount *= sourcePlayer.lowHpDamageMult;
+            }
+            if ((sourcePlayer.bossDamageMult || 1) > 1 && (this.isElite || this.isMiniBoss || this.isBoss)) {
+                amount *= sourcePlayer.bossDamageMult;
+            }
+            if ((sourcePlayer.huntersMarkEnabled || false) && (this.markedUntil || 0) > ((game && game.runClock) || 0) && (opts.isAbilityDamage || (opts.projectile && !opts.projectile.isBasicAttack))) {
+                amount *= 1.15;
+            }
+        }
         amount *= this._incomingDamageMultiplier();
         this.hp -= amount;
         this.hitFlash = 0.18;
-        const opts = (options && typeof options === 'object') ? options : {};
         if (game && typeof game.addDamageNumber === 'function' && opts.showNumber !== false) {
             game.addDamageNumber(this.x, this.y - this.size - 10, Math.ceil(amount), opts.color || '#ffee44', { big: !!opts.big, role: 'enemy' });
         }
@@ -155,7 +168,7 @@ class Enemy {
 
     _attackPlayer(player, game) {
         const finalAtk = this.atk * (this.isElite ? 1.35 : 1);
-        player.takeDamage(finalAtk, game);
+        player.takeDamage(finalAtk, { sourceType: 'enemy' }, game);
         if (this.isElite && this.eliteModifier === 'burning') player.applyEffect('burn');
         if (this.isElite && this.eliteModifier === 'toxic') player.applyEffect('poison');
         if (this.isElite && this.eliteModifier === 'vampiric') this.hp = Math.min(this.maxHp, this.hp + finalAtk * 0.4);
@@ -167,7 +180,7 @@ class Enemy {
             const p = game.player;
             const dx = p.x - this.x;
             const dy = p.y - this.y;
-            if (dx * dx + dy * dy < r * r) p.takeDamage(this.atk * 0.8, game);
+            if (dx * dx + dy * dy < r * r) p.takeDamage(this.atk * 0.8, { sourceType: 'enemy' }, game);
             spawnExplosion(game.particles, this.x, this.y, 18, ['#ff441a', '#ffbb33', '#ff7744'], 220, 7);
         }
     }
@@ -219,13 +232,13 @@ class Enemy {
 
 class Slime extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 55 : 30, atk: 8, moveSpeed: 70, attackCooldown: 1.5, attackRange: 38, size: 18, xpReward: 15, coinReward: Math.random() < 0.3 ? 1 : 0, spriteKey: 'enemy_slime', type: 'slime', isElite, eliteModifier });
+        super({ x, y, hp: isElite ? 55 : 30, atk: 8, moveSpeed: 70, attackCooldown: 1.5, attackRange: 38, size: 18, xpReward: 15, coinReward: rollCoinReward(1, 2), spriteKey: 'enemy_slime', type: 'slime', isElite, eliteModifier });
     }
 }
 
 class Bat extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 40 : 20, atk: 6, moveSpeed: 140, attackCooldown: 0.8, attackRange: 36, size: 16, xpReward: 18, coinReward: Math.random() < 0.25 ? 1 : 0, spriteKey: 'enemy_bat', type: 'bat', isElite, eliteModifier });
+        super({ x, y, hp: isElite ? 40 : 20, atk: 6, moveSpeed: 140, attackCooldown: 0.8, attackRange: 36, size: 16, xpReward: 18, coinReward: rollCoinReward(1, 2), spriteKey: 'enemy_bat', type: 'bat', isElite, eliteModifier });
     }
     _chasePlayer(dt, player, game) {
         const dx = player.x - this.x, dy = player.y - this.y;
@@ -241,7 +254,7 @@ class Bat extends Enemy {
 
 class Skeleton extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 80 : 45, atk: 10, moveSpeed: 65, attackCooldown: 1.8, attackRange: 200, size: 20, xpReward: 25, coinReward: Math.random() < 0.35 ? 1 : 0, spriteKey: 'enemy_skeleton', type: 'skeleton', isElite, eliteModifier });
+        super({ x, y, hp: isElite ? 80 : 45, atk: 10, moveSpeed: 65, attackCooldown: 1.8, attackRange: 200, size: 20, xpReward: 25, coinReward: rollCoinReward(3, 5), spriteKey: 'enemy_skeleton', type: 'skeleton', isElite, eliteModifier });
         this.rangedCooldown = 2.5;
         this.rangedTimer = 1;
     }
@@ -268,7 +281,7 @@ class Skeleton extends Enemy {
 
 class Spider extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 65 : 35, atk: 9, moveSpeed: 100, attackCooldown: 1.0, attackRange: 40, size: 19, xpReward: 22, coinReward: Math.random() < 0.3 ? 1 : 0, spriteKey: 'enemy_spider', type: 'spider', isElite, eliteModifier });
+        super({ x, y, hp: isElite ? 65 : 35, atk: 9, moveSpeed: 100, attackCooldown: 1.0, attackRange: 40, size: 19, xpReward: 22, coinReward: rollCoinReward(1, 2), spriteKey: 'enemy_spider', type: 'spider', isElite, eliteModifier });
     }
     _attackPlayer(player, game) {
         super._attackPlayer(player, game);
@@ -278,7 +291,7 @@ class Spider extends Enemy {
 
 class Bomber extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 40 : 25, atk: 35, moveSpeed: 115, attackCooldown: 999, attackRange: 48, size: 18, xpReward: 28, coinReward: Math.random() < 0.4 ? 2 : 0, spriteKey: 'enemy_bomber', type: 'bomber', isElite, eliteModifier });
+        super({ x, y, hp: isElite ? 40 : 25, atk: 35, moveSpeed: 115, attackCooldown: 999, attackRange: 48, size: 18, xpReward: 28, coinReward: rollCoinReward(3, 5), spriteKey: 'enemy_bomber', type: 'bomber', isElite, eliteModifier });
         this.primeTimer = 0;
     }
     _behave(dt, player, game) {
@@ -290,7 +303,7 @@ class Bomber extends Enemy {
                 const dmg = this.atk * (this.isElite ? 1.4 : 1);
                 const aoeR = 90;
                 const pdx = player.x - this.x, pdy = player.y - this.y;
-                if (pdx * pdx + pdy * pdy < aoeR * aoeR) player.takeDamage(dmg, game);
+                if (pdx * pdx + pdy * pdy < aoeR * aoeR) player.takeDamage(dmg, { sourceType: 'enemy' }, game);
                 spawnExplosion(game.particles, this.x, this.y, 22, ['#ff8800', '#ffcc00', '#ff4400'], 220, 8);
                 game.screenShake = Math.max(game.screenShake, 1.0);
                 this.dead = true;
@@ -305,7 +318,7 @@ class Bomber extends Enemy {
 
 class Healer extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 75 : 50, atk: 7, moveSpeed: 60, attackCooldown: 2.0, attackRange: 44, size: 19, xpReward: 30, coinReward: Math.random() < 0.45 ? 2 : 1, spriteKey: 'enemy_healer', type: 'healer', isElite, eliteModifier });
+        super({ x, y, hp: isElite ? 75 : 50, atk: 7, moveSpeed: 60, attackCooldown: 2.0, attackRange: 44, size: 19, xpReward: 30, coinReward: rollCoinReward(3, 5), spriteKey: 'enemy_healer', type: 'healer', isElite, eliteModifier });
         this.healCooldown = 3.5;
         this.healTimer = 2;
     }
@@ -345,7 +358,7 @@ class Healer extends Enemy {
 
 class Summoner extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 90 : 60, atk: 12, moveSpeed: 55, attackCooldown: 2.5, attackRange: 250, size: 21, xpReward: 35, coinReward: Math.random() < 0.5 ? 2 : 1, spriteKey: 'enemy_summoner', type: 'summoner', isElite, eliteModifier });
+        super({ x, y, hp: isElite ? 90 : 60, atk: 12, moveSpeed: 55, attackCooldown: 2.5, attackRange: 250, size: 21, xpReward: 35, coinReward: rollCoinReward(3, 5), spriteKey: 'enemy_summoner', type: 'summoner', isElite, eliteModifier });
         this.summonCooldown = 6;
         this.summonTimer = 3;
         this.maxMinions = 3;
@@ -376,31 +389,31 @@ class Summoner extends Enemy {
 
 class Minion extends Enemy {
     constructor(x, y) {
-        super({ x, y, hp: 15, atk: 5, moveSpeed: 120, attackCooldown: 0.9, attackRange: 36, size: 14, xpReward: 8, coinReward: 0, spriteKey: 'enemy_minion', type: 'minion', isElite: false });
+        super({ x, y, hp: 15, atk: 5, moveSpeed: 120, attackCooldown: 0.9, attackRange: 36, size: 14, xpReward: 8, coinReward: rollCoinReward(1, 2), spriteKey: 'enemy_minion', type: 'minion', isElite: false });
     }
 }
 
 class CorruptedMinion extends Enemy {
     constructor(x, y) {
-        super({ x, y, hp: 18, atk: 7, moveSpeed: 130, attackCooldown: 0.8, attackRange: 36, size: 14, xpReward: 10, coinReward: 0, spriteKey: 'enemy_corrupted_minion', type: 'corrupted_minion', isElite: false });
+        super({ x, y, hp: 18, atk: 7, moveSpeed: 130, attackCooldown: 0.8, attackRange: 36, size: 14, xpReward: 10, coinReward: rollCoinReward(1, 2), spriteKey: 'enemy_corrupted_minion', type: 'corrupted_minion', isElite: false });
     }
 }
 
 class CorruptedSlime extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 85 : 52, atk: 12, moveSpeed: 78, attackCooldown: 1.2, attackRange: 40, size: 20, xpReward: 24, coinReward: 1, spriteKey: 'enemy_corrupted_slime', type: 'corrupted_slime', isElite, eliteModifier, crystalChance: 0.1 });
+        super({ x, y, hp: isElite ? 85 : 52, atk: 12, moveSpeed: 78, attackCooldown: 1.2, attackRange: 40, size: 20, xpReward: 24, coinReward: rollCoinReward(3, 5), spriteKey: 'enemy_corrupted_slime', type: 'corrupted_slime', isElite, eliteModifier, crystalChance: 0.1 });
     }
 }
 
 class CorruptedSlimelet extends Enemy {
     constructor(x, y) {
-        super({ x, y, hp: 16, atk: 5, moveSpeed: 110, attackCooldown: 1.0, attackRange: 32, size: 12, xpReward: 7, coinReward: 0, spriteKey: 'enemy_corrupted_slime', type: 'corrupted_slimelet', isElite: false });
+        super({ x, y, hp: 16, atk: 5, moveSpeed: 110, attackCooldown: 1.0, attackRange: 32, size: 12, xpReward: 7, coinReward: rollCoinReward(1, 2), spriteKey: 'enemy_corrupted_slime', type: 'corrupted_slimelet', isElite: false });
     }
 }
 
 class VoidBat extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 55 : 30, atk: 11, moveSpeed: 170, attackCooldown: 0.95, attackRange: 34, size: 16, xpReward: 24, coinReward: 1, spriteKey: 'enemy_void_bat', type: 'void_bat', isElite, eliteModifier, crystalChance: 0.05 });
+        super({ x, y, hp: isElite ? 55 : 30, atk: 11, moveSpeed: 170, attackCooldown: 0.95, attackRange: 34, size: 16, xpReward: 24, coinReward: rollCoinReward(3, 5), spriteKey: 'enemy_void_bat', type: 'void_bat', isElite, eliteModifier, crystalChance: 0.05 });
         this.dashTimer = 0;
         this.fade = 1;
     }
@@ -426,7 +439,7 @@ class VoidBat extends Enemy {
 
 class Cultist extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 95 : 60, atk: 16, moveSpeed: 62, attackCooldown: 1.7, attackRange: 260, size: 20, xpReward: 33, coinReward: 2, spriteKey: 'enemy_cultist', type: 'cultist', isElite, eliteModifier, crystalChance: 0.1 });
+        super({ x, y, hp: isElite ? 95 : 60, atk: 16, moveSpeed: 62, attackCooldown: 1.7, attackRange: 260, size: 20, xpReward: 33, coinReward: rollCoinReward(6, 10), spriteKey: 'enemy_cultist', type: 'cultist', isElite, eliteModifier, crystalChance: 0.1 });
         this.summonTimer = 5;
         this.summonCooldown = 7;
     }
@@ -458,7 +471,7 @@ class CrystalGolem extends Enemy {
     static VULNERABLE_DAMAGE_MULTIPLIER = 1.5;
 
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 240 : 170, atk: 22, moveSpeed: 45, attackCooldown: 2.4, attackRange: 54, size: 25, xpReward: 52, coinReward: 3, spriteKey: 'enemy_crystal_golem', type: 'crystal_golem', isElite, eliteModifier, crystalChance: 0.2 });
+        super({ x, y, hp: isElite ? 240 : 170, atk: 22, moveSpeed: 45, attackCooldown: 2.4, attackRange: 54, size: 25, xpReward: 52, coinReward: rollCoinReward(6, 10), spriteKey: 'enemy_crystal_golem', type: 'crystal_golem', isElite, eliteModifier, crystalChance: 0.2 });
         this.slamTimer = 1.5;
         this.vulnerableTimer = 0;
     }
@@ -479,7 +492,7 @@ class CrystalGolem extends Enemy {
             this.slamTimer = 4.5;
             this.vulnerableTimer = 2.2;
             spawnExplosion(game.particles, this.x, this.y, 24, ['#8a44ff', '#d6a6ff', '#ffffff'], 220, 6);
-            if (d2 < 110 * 110) player.takeDamage(this.atk * 1.2, game);
+            if (d2 < 110 * 110) player.takeDamage(this.atk * 1.2, { sourceType: 'enemy' }, game);
         }
         this.atkTimer -= dt;
         if (d2 < this.attackRange * this.attackRange && this.atkTimer <= 0) {
@@ -491,7 +504,7 @@ class CrystalGolem extends Enemy {
 
 class CorruptedArcher extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 90 : 58, atk: 17, moveSpeed: 75, attackCooldown: 1.4, attackRange: 300, size: 19, xpReward: 35, coinReward: 2, spriteKey: 'enemy_corrupted_archer', type: 'corrupted_archer', isElite, eliteModifier, crystalChance: 0.08 });
+        super({ x, y, hp: isElite ? 90 : 58, atk: 17, moveSpeed: 75, attackCooldown: 1.4, attackRange: 300, size: 19, xpReward: 35, coinReward: rollCoinReward(6, 10), spriteKey: 'enemy_corrupted_archer', type: 'corrupted_archer', isElite, eliteModifier, crystalChance: 0.08 });
     }
     _behave(dt, player, game) {
         const dx = player.x - this.x, dy = player.y - this.y;
@@ -516,7 +529,7 @@ class CorruptedArcher extends Enemy {
 
 class VoidHound extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 120 : 76, atk: 18, moveSpeed: 115, attackCooldown: 0.9, attackRange: 42, size: 20, xpReward: 38, coinReward: 2, spriteKey: 'enemy_void_hound', type: 'void_hound', isElite, eliteModifier, crystalChance: 0.1 });
+        super({ x, y, hp: isElite ? 120 : 76, atk: 18, moveSpeed: 115, attackCooldown: 0.9, attackRange: 42, size: 20, xpReward: 38, coinReward: rollCoinReward(6, 10), spriteKey: 'enemy_void_hound', type: 'void_hound', isElite, eliteModifier, crystalChance: 0.1 });
         this.lungeTimer = 1.8;
     }
     _behave(dt, player, game) {
@@ -535,7 +548,7 @@ class VoidHound extends Enemy {
 
 class CrystalTurret extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 140 : 95, atk: 16, moveSpeed: 0, attackCooldown: 1.6, attackRange: 340, size: 21, xpReward: 32, coinReward: 2, spriteKey: 'enemy_crystal_turret', type: 'crystal_turret', isElite, eliteModifier, crystalChance: 0.15 });
+        super({ x, y, hp: isElite ? 140 : 95, atk: 16, moveSpeed: 0, attackCooldown: 1.6, attackRange: 340, size: 21, xpReward: 32, coinReward: rollCoinReward(6, 10), spriteKey: 'enemy_crystal_turret', type: 'crystal_turret', isElite, eliteModifier, crystalChance: 0.15 });
         this.rotation = 0;
     }
     _chasePlayer() {}
@@ -552,7 +565,7 @@ class CrystalTurret extends Enemy {
 
 class CorruptedSummoner extends Enemy {
     constructor(x, y, isElite, eliteModifier) {
-        super({ x, y, hp: isElite ? 160 : 110, atk: 14, moveSpeed: 58, attackCooldown: 2.2, attackRange: 280, size: 22, xpReward: 45, coinReward: 3, spriteKey: 'enemy_corrupted_summoner', type: 'corrupted_summoner', isElite, eliteModifier, crystalChance: 0.14 });
+        super({ x, y, hp: isElite ? 160 : 110, atk: 14, moveSpeed: 58, attackCooldown: 2.2, attackRange: 280, size: 22, xpReward: 45, coinReward: rollCoinReward(6, 10), spriteKey: 'enemy_corrupted_summoner', type: 'corrupted_summoner', isElite, eliteModifier, crystalChance: 0.14 });
         this.summonTimer = 3.5;
         this.buffTimer = 2.8;
     }
@@ -595,7 +608,7 @@ class CorruptedSummoner extends Enemy {
 
 class Necromancer extends Enemy {
     constructor(x, y) {
-        super({ x, y, hp: 800, atk: 18, moveSpeed: 55, attackCooldown: 1.2, attackRange: 350, size: 44, xpReward: 400, coinReward: 8, spriteKey: 'boss_necromancer', type: 'boss_necromancer', isElite: false });
+        super({ x, y, hp: 800, atk: 18, moveSpeed: 55, attackCooldown: 1.2, attackRange: 350, size: 44, xpReward: 400, coinReward: 35, spriteKey: 'boss_necromancer', type: 'boss_necromancer', isElite: false });
         this.isBoss = true;
         this.phase = 1;
         this.phaseSwitched = false;
@@ -665,7 +678,7 @@ class Necromancer extends Enemy {
 
 class CrystalBehemoth extends Enemy {
     constructor(x, y) {
-        super({ x, y, hp: 1400, atk: 26, moveSpeed: 62, attackCooldown: 1.1, attackRange: 60, size: 50, xpReward: 550, coinReward: 14, spriteKey: 'boss_crystal_behemoth', type: 'boss_crystal_behemoth', isElite: false, crystalChance: 1 });
+        super({ x, y, hp: 1400, atk: 26, moveSpeed: 62, attackCooldown: 1.1, attackRange: 60, size: 50, xpReward: 550, coinReward: 55, spriteKey: 'boss_crystal_behemoth', type: 'boss_crystal_behemoth', isElite: false, crystalChance: 1 });
         this.isBoss = true;
         this.phase = 1;
         this.slamTimer = 2.5;
@@ -693,7 +706,7 @@ class CrystalBehemoth extends Enemy {
         if (this.slamTimer <= 0) {
             this.slamTimer = this.phase === 2 ? 2.2 : 3.1;
             const dx = player.x - this.x, dy = player.y - this.y;
-            if (dx * dx + dy * dy < 140 * 140) player.takeDamage(this.atk * 1.2, game);
+            if (dx * dx + dy * dy < 140 * 140) player.takeDamage(this.atk * 1.2, { sourceType: 'enemy' }, game);
             spawnExplosion(game.particles, this.x, this.y, 28, ['#a55cff', '#dcb2ff', '#ffffff'], 250, 8);
         }
 
@@ -731,7 +744,7 @@ class CrystalBehemoth extends Enemy {
 
 class VoidHerald extends Enemy {
     constructor(x, y) {
-        super({ x, y, hp: 2200, atk: 32, moveSpeed: 80, attackCooldown: 0.95, attackRange: 420, size: 54, xpReward: 900, coinReward: 24, spriteKey: 'boss_void_herald', type: 'boss_void_herald', isElite: false, crystalChance: 1 });
+        super({ x, y, hp: 2200, atk: 32, moveSpeed: 80, attackCooldown: 0.95, attackRange: 420, size: 54, xpReward: 900, coinReward: 90, spriteKey: 'boss_void_herald', type: 'boss_void_herald', isElite: false, crystalChance: 1 });
         this.isBoss = true;
         this.phase = 1;
         this.teleportTimer = 3.6;

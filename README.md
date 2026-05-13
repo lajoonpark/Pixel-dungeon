@@ -18,7 +18,9 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 | **2-5 Abilities per class** | Up to 5 keyed abilities (J K L U I); each class has its own dash |
 | **15+ Enemy Types + Multi-Boss** | Base dungeon enemies + Corrupted Depths enemy roster (Corrupted Slime, Void Bat, Cultist, Crystal Golem, Corrupted Archer, Void Hound, Crystal Turret, Corrupted Summoner) |
 | **2 Dungeons** | Dungeon 1: 10 rooms, Necromancer final boss · Dungeon 2: 20 rooms, Crystal Behemoth mini boss (room 10), Void Herald final boss (room 20) |
-| **Level-up System** | Choose 1 of 3 random run upgrades on level-up |
+| **Cards System** | Own/equip cards, card presets, rarity filters, and equipped-only in-run card pool |
+| **Card Shop + Coins** | Permanent coin currency, 4-card rotating shop every 5 minutes, rarity-based prices |
+| **Level-up System** | Choose 1 of 3 random run cards from your equipped owned set (equal in-run rarity weighting) |
 | **Permanent Shop** | Categorized Defense/Offense/Utility upgrade trees with scaling crystal costs |
 | **Status Effects** | Burn, Freeze, Poison, Shock, Bleed, Slow |
 | **Mobile Support** | On-screen joystick + touch buttons |
@@ -118,6 +120,22 @@ Only **Human Adventurer** is unlocked at the start. All others must be obtained 
   Focused on basic attack damage, ability damage scaling, attack speed, and cooldown reduction.
 - **Utility:** Fortune, Crystal Hoarder  
   Focused on class-roll rarity progression and guaranteed crystal income.
+
+## Cards, Shop, and Coins
+
+- Main menu now includes: **Start Run, Class Select, Cards, Shop, Permanent Upgrades, Settings**
+- **How to Play** moved into **Settings**
+- Coins are a permanent currency saved in localStorage and earned from enemy kills and room/chest rewards
+- Card Shop:
+  - Shows 4 unowned cards
+  - Rotates every 5 minutes (persisted via save timestamp)
+  - Rarity affects only shop chance, price, and visuals
+- Dungeon level-up:
+  - Uses only **equipped + owned** cards (plus starter fallback when needed)
+  - Rarity does **not** change in-run roll chance; equipped cards are equally weighted
+- Card presets:
+  - Create, rename, save current, load, delete
+  - Persisted in localStorage
 
 ## Crystal Rewards
 

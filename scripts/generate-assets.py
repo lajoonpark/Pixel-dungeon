@@ -1007,6 +1007,70 @@ def gen_ui_frame():
     d.rectangle([59,59,61,61], fill=(120,100,160,255))
     save(img, 'ui_frame.png')
 
+def gen_card_system_assets():
+    # Card back
+    back = new(32, 32)
+    d = draw(back)
+    d.rectangle([0,0,31,31], fill=(24,18,38,255))
+    d.rectangle([1,1,30,30], outline=(120,90,170,255), width=2)
+    for i in range(4, 28, 6):
+        d.line([4,i,27,i], fill=(95,75,140,140), width=1)
+    d.ellipse([10,10,21,21], fill=(165,130,230,180))
+    save(scale(back, 2), 'card_back.png')
+
+    # Utility UI icons
+    icons = {
+        'icon_shop_menu': ((220, 180, 95), 'bag'),
+        'icon_cards_menu': ((140, 160, 240), 'card'),
+        'icon_coins': ((235, 190, 70), 'coin'),
+        'icon_preset': ((120, 210, 150), 'bookmark'),
+        'icon_lock': ((185, 95, 120), 'lock'),
+        'icon_equipped': ((115, 215, 120), 'check')
+    }
+    for name, (rgb, kind) in icons.items():
+        img = new(16, 16)
+        d = draw(img)
+        d.rectangle([0,0,15,15], fill=(18, 14, 28, 0))
+        if kind == 'bag':
+            d.ellipse([3,3,13,7], fill=rgb + (255,))
+            d.rectangle([3,6,13,13], fill=rgb + (235,))
+        elif kind == 'card':
+            d.rectangle([3,2,12,13], fill=rgb + (230,), outline=(230, 230, 255, 220), width=1)
+            d.rectangle([5,5,10,8], fill=(220, 220, 255, 180))
+        elif kind == 'coin':
+            d.ellipse([2,3,13,14], fill=rgb + (255,))
+            d.ellipse([4,5,11,12], fill=(255,230,120,220))
+        elif kind == 'bookmark':
+            d.rectangle([4,2,11,13], fill=rgb + (240,))
+            d.polygon([(4,13),(7,10),(11,13)], fill=(90,150,100,255))
+        elif kind == 'lock':
+            d.rectangle([4,7,12,13], fill=rgb + (240,))
+            d.arc([5,2,11,9], 180, 360, fill=(220,160,180,255), width=2)
+        elif kind == 'check':
+            d.ellipse([2,2,13,13], fill=rgb + (220,))
+            d.line([4,8,7,11], fill=(235,255,235,255), width=2)
+            d.line([7,11,12,5], fill=(235,255,235,255), width=2)
+        save(scale(img, 3), f'{name}.png')
+
+    # New card icons
+    card_specs = {
+        'card_steady_aim': (130,170,255), 'card_thick_boots': (145,120,90), 'card_small_snack': (200,170,95),
+        'card_coin_pouch': (210,180,70), 'card_calm_focus': (140,150,210), 'card_finishing_blow': (215,115,115),
+        'card_emergency_roll': (120,170,210), 'card_treasure_sense': (220,200,100), 'card_battle_rhythm': (210,140,95),
+        'card_mana_battery': (135,125,215), 'card_execution_chain': (215,125,125), 'card_crystal_skin': (125,175,235),
+        'card_overcharge': (185,120,245), 'card_hunters_mark': (120,190,120), 'card_room_momentum': (120,200,165),
+        'card_second_wind': (235,180,130), 'card_storm_of_blades': (180,165,245), 'card_unstable_power': (235,120,120),
+        'card_boss_hunter': (235,160,90), 'card_reality_fracture': (195,135,255), 'card_golden_curse': (225,185,85),
+    }
+    for name, rgb in card_specs.items():
+        img = new(24, 24)
+        d = draw(img)
+        d.rectangle([0,0,23,23], fill=(20,15,32,255))
+        d.rectangle([1,1,22,22], outline=rgb + (255,), width=1)
+        d.ellipse([5,5,18,18], fill=rgb + (200,))
+        d.ellipse([8,8,15,15], fill=(240,230,255,170))
+        save(scale(img, 2), f'{name}.png')
+
 # ── Corrupted Depths assets ────────────────────────────────────────────────────
 
 def _gen_enemy_blob(name, base_rgb, eye_rgb=(30, 20, 50)):
@@ -1237,6 +1301,7 @@ if __name__ == '__main__':
     gen_particle_spark()
     gen_heal_effect()
     gen_ui_frame()
+    gen_card_system_assets()
     gen_corrupted_depths_assets()
 
     print("\n[Class system assets]")

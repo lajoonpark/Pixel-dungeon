@@ -234,10 +234,12 @@ const UI = {
 
         // Buttons
         const btns = [
-            { id:'play',     label:'▶  START RUN',   y:245, color:'#2244aa', hover:'#3355cc' },
-            { id:'shop',     label:'🛒 UPGRADES',    y:300, color:'#442200', hover:'#664400' },
-            { id:'help',     label:'?  HOW TO PLAY', y:355, color:'#224422', hover:'#336633' },
-            { id:'settings', label:'⚙  SETTINGS',    y:410, color:'#332244', hover:'#554477' },
+            { id:'play',           label:'▶  START RUN',          y:225, color:'#2244aa', hover:'#3355cc' },
+            { id:'class_select',   label:'⚔  CLASS SELECT',       y:270, color:'#1f3f77', hover:'#2f53a0' },
+            { id:'cards',          label:'🃏  CARDS',              y:315, color:'#2b3f2a', hover:'#3a5a3d' },
+            { id:'card_shop',      label:'🛒  SHOP',               y:360, color:'#5a3a16', hover:'#7a4d1d' },
+            { id:'permanent_shop', label:'🔮  PERMANENT UPGRADES', y:405, color:'#442200', hover:'#664400' },
+            { id:'settings',       label:'⚙  SETTINGS',           y:450, color:'#332244', hover:'#554477' },
         ];
 
         for (const b of btns) {
@@ -935,6 +937,141 @@ const UI = {
         ctx.fillText('← Back to Menu', 30, 580);
     },
 
+    renderCardsMenu(ctx, saveData, cards, hoverIdx, rarityFilter, typeFilter) {
+        ctx.fillStyle = '#0b0a14';
+        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillStyle = '#d8c5ff';
+        ctx.font = 'bold 30px monospace';
+        ctx.fillText('CARDS', 30, 48);
+
+        Assets.draw(ctx, 'icon_coins', 640, 20, 18, 18);
+        ctx.fillStyle = '#ffcc55';
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText(`${(saveData && saveData.coins) || 0}`, 664, 35);
+
+        const equipped = new Set((saveData && saveData.equippedCardIds) || []);
+        const owned = new Set((saveData && saveData.ownedCardIds) || []);
+        ctx.fillStyle = '#9e8fb8';
+        ctx.font = '13px monospace';
+        ctx.fillText(`Equipped: ${equipped.size}  Owned: ${owned.size}/${(typeof UpgradeSystem !== 'undefined' && UpgradeSystem.allCards().length) || 0}`, 30, 75);
+
+        ctx.fillStyle = '#1b2233';
+        ctx.fillRect(40, 95, 130, 30);
+        ctx.fillRect(190, 95, 170, 30);
+        ctx.fillStyle = '#c8d4ff';
+        ctx.fillText(`Rarity: ${(rarityFilter || 'all').toUpperCase()}`, 48, 115);
+        ctx.fillText(`Type: ${(typeFilter || 'all').toUpperCase()}`, 198, 115);
+
+        const preset = (saveData && Array.isArray(saveData.cardPresets))
+            ? saveData.cardPresets.find(p => p.id === saveData.selectedCardPresetId)
+            : null;
+        ctx.fillStyle = '#9e8fb8';
+        ctx.fillText(`Preset: ${(preset && preset.name) || 'None'}`, 590, 80);
+        const presetBtns = ['Save', 'Load', 'Rename', 'Create', 'Delete', 'Next'];
+        presetBtns.forEach((label, i) => {
+            ctx.fillStyle = '#2f2a43';
+            ctx.fillRect(590, 95 + i * 35, 170, 30);
+            ctx.fillStyle = '#d7d0ec';
+            ctx.fillText(label, 650, 115 + i * 35);
+        });
+
+        cards.forEach((card, i) => {
+            const col = i % 4;
+            const row = Math.floor(i / 4);
+            const x = 70 + col * 170;
+            const y = 180 + row * 170;
+            const rarityColor = (typeof ClassSystem !== 'undefined' && ClassSystem.rarityColor) ? ClassSystem.rarityColor(card.rarity) : '#888';
+            const isOwned = owned.has(card.id);
+            const isEquipped = equipped.has(card.id);
+            ctx.fillStyle = hoverIdx === i ? '#2a233a' : '#171326';
+            ctx.strokeStyle = rarityColor;
+            ctx.lineWidth = isEquipped ? 3 : 2;
+            ctx.beginPath();
+            ctx.roundRect(x, y, 150, 150, 8);
+            ctx.fill();
+            ctx.stroke();
+            if (!isOwned) ctx.fillStyle = 'rgba(0,0,0,0.55)', ctx.fillRect(x, y, 150, 150);
+            Assets.draw(ctx, card.icon || 'card_back', x + 54, y + 12, 42, 42);
+            if (!isOwned) Assets.draw(ctx, 'icon_lock', x + 116, y + 8, 24, 24);
+            if (isEquipped) Assets.draw(ctx, 'icon_equipped', x + 8, y + 8, 24, 24);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(card.name, x + 75, y + 70);
+            ctx.fillStyle = '#a9a4c7';
+            ctx.font = '10px monospace';
+            ctx.fillText((card.description || card.desc || '').slice(0, 32), x + 75, y + 86);
+            ctx.fillStyle = isOwned ? (isEquipped ? '#88ff88' : '#9ba9d0') : '#aa8899';
+            ctx.fillText(!isOwned ? 'LOCKED' : (isEquipped ? 'EQUIPPED' : 'CLICK TO EQUIP'), x + 75, y + 138);
+            ctx.textAlign = 'left';
+        });
+        ctx.fillStyle = '#887799';
+        ctx.font = '13px monospace';
+        ctx.fillText('← Back to Menu', 30, 580);
+    },
+
+    renderCardShop(ctx, saveData, shopData, hoverIdx) {
+        ctx.fillStyle = '#0c0a14';
+        ctx.fillRect(0, 0, 800, 600);
+        ctx.fillStyle = '#e6cc88';
+        ctx.font = 'bold 30px monospace';
+        ctx.fillText('CARD SHOP', 30, 50);
+        Assets.draw(ctx, 'icon_coins', 610, 18, 22, 22);
+        ctx.fillStyle = '#ffcc55';
+        ctx.font = 'bold 18px monospace';
+        ctx.fillText(`${(saveData && saveData.coins) || 0}`, 640, 35);
+
+        const remainingSec = Math.ceil(((shopData && shopData.remainingMs) || 0) / 1000);
+        const mm = String(Math.floor(remainingSec / 60)).padStart(2, '0');
+        const ss = String(remainingSec % 60).padStart(2, '0');
+        ctx.fillStyle = '#a6a0c7';
+        ctx.font = '13px monospace';
+        ctx.fillText(`Next rotation: ${mm}:${ss}`, 30, 78);
+
+        const cards = (shopData && shopData.cards) || [];
+        if (cards.length === 0) {
+            ctx.fillStyle = '#c8c4dc';
+            ctx.font = 'bold 22px monospace';
+            ctx.fillText('All cards owned', 270, 310);
+        }
+
+        cards.forEach((card, i) => {
+            const x = 70 + i * 180;
+            const y = 210;
+            const rarityColor = (typeof ClassSystem !== 'undefined' && ClassSystem.rarityColor) ? ClassSystem.rarityColor(card.rarity) : '#888';
+            const cost = card.shopCost || 0;
+            const owned = ((saveData && saveData.ownedCardIds) || []).includes(card.id);
+            const canAfford = ((saveData && saveData.coins) || 0) >= cost;
+            ctx.fillStyle = hoverIdx === i ? '#2a233a' : '#171326';
+            ctx.strokeStyle = rarityColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(x, y, 160, 220, 9);
+            ctx.fill();
+            ctx.stroke();
+            Assets.draw(ctx, card.icon || 'card_back', x + 56, y + 16, 48, 48);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(card.name, x + 80, y + 82);
+            ctx.fillStyle = '#b0a6ca';
+            ctx.font = '10px monospace';
+            ctx.fillText((card.description || card.desc || '').slice(0, 30), x + 80, y + 100);
+            ctx.fillStyle = '#ffd36e';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText(`${cost} coins`, x + 80, y + 132);
+            ctx.fillStyle = owned ? '#334a66' : (canAfford ? '#325e2f' : '#4b2a32');
+            ctx.fillRect(x + 30, y + 170, 100, 28);
+            ctx.fillStyle = owned ? '#bdd4ff' : (canAfford ? '#ccffd0' : '#d09aaa');
+            ctx.fillText(owned ? 'OWNED' : (canAfford ? 'BUY' : 'NOT ENOUGH'), x + 80, y + 189);
+            ctx.textAlign = 'left';
+        });
+
+        ctx.fillStyle = '#887799';
+        ctx.font = '13px monospace';
+        ctx.fillText('← Back to Menu', 30, 580);
+    },
+
     renderPause(ctx) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(0, 0, 800, 600);
@@ -1007,8 +1144,9 @@ const UI = {
         ctx.fillText('Manage your local save data.', 400, 130);
 
         ctx.fillStyle = '#aaaacc';
-        ctx.fillText(`Crystals: ${(saveData && saveData.crystals) || 0}  •  Runs: ${(saveData && saveData.totalRuns) || 0}`, 400, 170);
+        ctx.fillText(`Crystals: ${(saveData && saveData.crystals) || 0}  •  Coins: ${(saveData && saveData.coins) || 0}  •  Runs: ${(saveData && saveData.totalRuns) || 0}`, 400, 170);
 
+        this._menuButton(ctx, 'HOW TO PLAY', 400, 240, '#244433');
         this._menuButton(ctx, 'DELETE SAVE', 400, 300, '#552233');
         this._menuButton(ctx, '← Back', 400, 360, '#223344');
 

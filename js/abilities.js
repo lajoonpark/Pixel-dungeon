@@ -14,7 +14,7 @@ function _meleeAoe(player, game, radius, dmg, effectType, color) {
         if (e.dead) continue;
         const dx = e.x - player.x, dy = e.y - player.y;
         if (dx * dx + dy * dy < radius * radius) {
-            e.takeDamage(dmg, effectType || 'physical', game);
+            e.takeDamage(dmg, effectType || 'physical', game, { sourcePlayer: player, isAbilityDamage: true });
             hit++;
         }
     }
