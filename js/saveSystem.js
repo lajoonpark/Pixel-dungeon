@@ -11,7 +11,7 @@ const SaveSystem = {
         unlockedClasses: ['human_adventurer'],
         selectedClass: 'human_adventurer',
         rollCount: 0,
-        rollCost: 20,
+        rollCost: 10,
         classShards: {},
     },
 

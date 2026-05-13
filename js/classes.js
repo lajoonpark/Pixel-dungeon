@@ -328,9 +328,9 @@ const ClassSystem = {
     /** Get rarity color */
     rarityColor(rarity) { return RARITY_COLORS[rarity] || '#ffffff'; },
 
-    /** Crystal cost for a given roll count (0-indexed: first roll = 20) */
+    /** Crystal cost for a given roll count (0-indexed: first roll = 10) */
     rollCost(rollCount) {
-        return Math.min(20 + rollCount * 10, 100);
+        return Math.min(10 + rollCount * 3, 50);
     },
 
     /** Build an ability list for a player from class abilityIds */
