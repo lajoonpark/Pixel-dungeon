@@ -1,5 +1,7 @@
 'use strict';
 
+const PLAYER_MAX_DODGE_CHANCE = 0.5;
+
 class Player {
     constructor(classId) {
         const classDef = (typeof ClassSystem !== 'undefined' && ClassSystem.get(classId))
@@ -31,6 +33,8 @@ class Player {
         this.healingMult         = 1;
         this.burnDurationMult    = 1;
         this.critDmgBonus        = 0;
+        this.damageTakenMult     = 1;
+        this.dodgeChance         = 0;
 
         // Auto-attack state
         this.atkCooldown   = 0;
@@ -121,7 +125,16 @@ class Player {
             ? gameArg
             : ((sourceOrContext && typeof sourceOrContext === 'object') ? sourceOrContext : null);
 
+        const dodgeChance = Math.min(PLAYER_MAX_DODGE_CHANCE, Math.max(0, this.dodgeChance || 0));
+        if (dodgeChance > 0 && Math.random() < dodgeChance) {
+            if (game && typeof game.addDamageNumber === 'function') {
+                game.addDamageNumber(this.x, this.y - 40, 0, '#88ddff', { text: 'DODGE', big: true, role: 'player' });
+            }
+            return;
+        }
+
         amount = Number.isFinite(amount) ? amount : 0;
+        amount *= (this.damageTakenMult || 1);
         if (this._frostArmor) amount *= 0.6; // Frost Armor: 40% damage reduction
         this.hp = Math.max(0, this.hp - amount);
         this.hitFlash = 0.25;

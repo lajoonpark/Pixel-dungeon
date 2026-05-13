@@ -61,7 +61,6 @@ const DUNGEON_DEFS = {
 };
 const DEFAULT_ABILITY_KEY_COUNT = 2;
 const ABILITY_HINT_KEYS = ['J', 'K', 'L', 'U', 'I'];
-const CRYSTAL_FINDER_BONUS_CHANCE_PER_LEVEL = 0.10;
 
 const Game = {
     state: STATES.LOADING,
@@ -105,6 +104,8 @@ const Game = {
     hoverClass: null,
     hoverCard: -1,
     hoverShopItem: -1,
+    hoverShopTab: null,
+    selectedShopCategory: 'defense',
 
     // Mobile joystick
     joystick: { active: false, startX: 0, startY: 0, dx: 0, dy: 0 },
@@ -125,6 +126,7 @@ const Game = {
         this.ctx = this.canvas.getContext('2d');
         this.saveData = SaveSystem.load();
         if (!this.saveData.selectedDungeon || !DUNGEON_DEFS[this.saveData.selectedDungeon]) this.saveData.selectedDungeon = 'dungeon1';
+        this.selectedShopCategory = UpgradeSystem.getPermanentCategories()[0] || 'defense';
         this.currentDungeonId = this.saveData.selectedDungeon;
         this.currentDungeon = DUNGEON_DEFS[this.currentDungeonId] || DUNGEON_DEFS.dungeon1;
         this.crystals = this.saveData.crystals || 0;
@@ -296,11 +298,24 @@ const Game = {
             });
             UI._hoveredCard = this.hoverCard;
         } else if (this.state === STATES.SHOP) {
+            this.hoverShopTab = null;
+            const categories = UpgradeSystem.getPermanentCategories();
+            categories.forEach((category, idx) => {
+                const x = 130 + idx * 175;
+                const y = 98;
+                const w = 160;
+                const h = 34;
+                if (mx >= x && mx <= x + w && my >= y && my <= y + h) this.hoverShopTab = category;
+            });
+
             this.hoverShopItem = -1;
-            PERMANENT_UPGRADES.forEach((_, i) => {
-                const col = i % 3, row = Math.floor(i/3);
-                const x = 130 + col*220, y = 100 + row*160;
-                if (mx >= x && mx <= x+200 && my >= y && my <= y+140) this.hoverShopItem = i;
+            const upgrades = UpgradeSystem.getPermanentUpgradesByCategory(this.selectedShopCategory);
+            upgrades.forEach((_, i) => {
+                const col = i % 2;
+                const row = Math.floor(i / 2);
+                const x = 130 + col * 270;
+                const y = 150 + row * 190;
+                if (mx >= x && mx <= x + 250 && my >= y && my <= y + 170) this.hoverShopItem = i;
             });
         }
     },
@@ -385,11 +400,29 @@ const Game = {
             if (my >= 450 && my <= 490 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
         } else if (this.state === STATES.SHOP) {
             if (my >= 560) { this.state = STATES.MENU; return; }
-            PERMANENT_UPGRADES.forEach((pu, i) => {
-                const col = i % 3, row = Math.floor(i/3);
-                const x = 130 + col*220, y = 100 + row*160;
-                if (mx >= x+50 && mx <= x+150 && my >= y+100 && my <= y+128) {
-                    this._buyPermanentUpgrade(pu, i);
+
+            const categories = UpgradeSystem.getPermanentCategories();
+            for (let idx = 0; idx < categories.length; idx++) {
+                const category = categories[idx];
+                const x = 130 + idx * 175;
+                const y = 98;
+                const w = 160;
+                const h = 34;
+                if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+                    this.selectedShopCategory = category;
+                    this.hoverShopItem = -1;
+                    return;
+                }
+            }
+
+            const upgrades = UpgradeSystem.getPermanentUpgradesByCategory(this.selectedShopCategory);
+            upgrades.forEach((pu, i) => {
+                const col = i % 2;
+                const row = Math.floor(i / 2);
+                const x = 130 + col * 270;
+                const y = 150 + row * 190;
+                if (mx >= x + 75 && mx <= x + 175 && my >= y + 130 && my <= y + 158) {
+                    this._buyPermanentUpgrade(pu);
                 }
             });
         } else if (this.state === STATES.PAUSED) {
@@ -418,7 +451,8 @@ const Game = {
         // Scale cost: +3 per roll, cap at 50
         this.saveData.rollCost = Math.min(50, cost + 3);
 
-        const result = (typeof ClassSystem !== 'undefined') ? ClassSystem.roll() : { id: 'human_adventurer' };
+        const fortuneRank = this.getFortuneRank();
+        const result = (typeof ClassSystem !== 'undefined') ? ClassSystem.roll(fortuneRank) : { id: 'human_adventurer' };
         const unlocked = this.saveData.unlockedClasses || ['human_adventurer'];
         const isDuplicate = unlocked.includes(result.id);
 
@@ -530,13 +564,17 @@ const Game = {
         }
     },
 
-    _buyPermanentUpgrade(pu, i) {
+    _buyPermanentUpgrade(pu) {
         const rank = this.saveData.permanentUpgrades[pu.id] || 0;
         const cost = UpgradeSystem.permanentCost(pu, rank);
         if (rank < pu.maxRank && this.spendCrystals(cost, `shop_upgrade_${pu.id}`)) {
             this.saveData.permanentUpgrades[pu.id] = rank + 1;
             SaveSystem.save(this.saveData);
         }
+    },
+
+    getFortuneRank() {
+        return (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_fortune) || 0;
     },
 
     _updateControlHintText(classId) {
@@ -656,20 +694,17 @@ const Game = {
 
         const dungeon = this.currentDungeon || DUNGEON_DEFS.dungeon1;
         let amount = dungeon.crystalPerRoom || 1;
-        const crystalFinderLevel = (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_crystal) || 0;
-        // Keep this capped for forward compatibility if Crystal Finder max rank increases later.
-        const bonusChance = Math.min(1, crystalFinderLevel * CRYSTAL_FINDER_BONUS_CHANCE_PER_LEVEL);
-
-        if (Math.random() < bonusChance) {
-            amount += 1;
-            if (this.player) {
-                this.addDamageNumber(this.player.x, this.player.y - 30, 0, '#a855f7', { text: 'Crystal Finder +1' });
-            }
-        }
+        const crystalHoarderRank = (this.saveData && this.saveData.permanentUpgrades && this.saveData.permanentUpgrades.p_crystal) || 0;
+        amount += crystalHoarderRank;
 
         this.addCrystals(amount, `room_clear_${roomIndex + 1}`);
 
         if (this.player) {
+            if (crystalHoarderRank > 0) {
+                this.addDamageNumber(this.player.x, this.player.y - 30, 0, '#a855f7', {
+                    text: `Crystal Hoarder +${crystalHoarderRank}`
+                });
+            }
             this.addDamageNumber(
                 this.player.x,
                 this.player.y - 50,
@@ -956,7 +991,7 @@ const Game = {
                 UI.renderClassCollection(ctx, this.saveData);
                 break;
             case STATES.CLASS_ROLL:
-                UI.renderClassRoll(ctx, this.saveData, this.rollAnimActive, this.rollAnimPhase, this.rollAnimResult, this.rollAnimTimer);
+                UI.renderClassRoll(ctx, this.saveData, this.rollAnimActive, this.rollAnimPhase, this.rollAnimResult, this.rollAnimTimer, this.getFortuneRank());
                 break;
             case STATES.HELP:
                 UI.renderHelp(ctx);
@@ -976,7 +1011,7 @@ const Game = {
                 UI.renderVictory(ctx, this);
                 break;
             case STATES.SHOP:
-                UI.renderShop(ctx, this.saveData, this.hoverShopItem);
+                UI.renderShop(ctx, this.saveData, this.hoverShopItem, this.selectedShopCategory, this.hoverShopTab);
                 break;
             case STATES.SETTINGS:
                 UI.renderSettings(ctx, this.saveData);

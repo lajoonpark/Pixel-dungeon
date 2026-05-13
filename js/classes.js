@@ -18,8 +18,9 @@ const RARITY_COLORS = {
     mythic:    '#cc2222',
 };
 
-const RARITY_WEIGHTS = { common: 60, rare: 25, epic: 10, legendary: 4, mythic: 1 };
-const _TOTAL_RARITY_WEIGHT = Object.values(RARITY_WEIGHTS).reduce((a, b) => a + b, 0);
+const BASE_RARITY_WEIGHTS = { common: 60, rare: 25, epic: 10, legendary: 4, mythic: 1 };
+const MIN_COMMON_WEIGHT = 35;
+const FORTUNE_WEIGHT_SHIFTS = { common: 2.0, rare: 1.0, epic: 0.6, legendary: 0.3, mythic: 0.1 };
 
 // ── Class definitions ─────────────────────────────────────────────────────────
 // Each class:  id, name, rarity, stats, passiveDesc, description, abilityIds,
@@ -309,11 +310,33 @@ const ClassSystem = {
         return Object.values(CLASS_DEFS).filter(c => c.rarity === rarity);
     },
 
+    getRarityWeights(fortuneRank = 0) {
+        const rank = Math.max(0, Math.min(5, fortuneRank | 0));
+        const adjusted = {
+            common: Math.max(MIN_COMMON_WEIGHT, BASE_RARITY_WEIGHTS.common - rank * FORTUNE_WEIGHT_SHIFTS.common),
+            rare: BASE_RARITY_WEIGHTS.rare + rank * FORTUNE_WEIGHT_SHIFTS.rare,
+            epic: BASE_RARITY_WEIGHTS.epic + rank * FORTUNE_WEIGHT_SHIFTS.epic,
+            legendary: BASE_RARITY_WEIGHTS.legendary + rank * FORTUNE_WEIGHT_SHIFTS.legendary,
+            mythic: BASE_RARITY_WEIGHTS.mythic + rank * FORTUNE_WEIGHT_SHIFTS.mythic
+        };
+        const total = Object.values(adjusted).reduce((a, b) => a + b, 0);
+        const scale = total > 0 ? 100 / total : 1;
+        return {
+            common: adjusted.common * scale,
+            rare: adjusted.rare * scale,
+            epic: adjusted.epic * scale,
+            legendary: adjusted.legendary * scale,
+            mythic: adjusted.mythic * scale
+        };
+    },
+
     /** Roll a random class based on rarity weights */
-    rollRandom() {
-        let r = Math.random() * _TOTAL_RARITY_WEIGHT;
+    rollRandom(fortuneRank = 0) {
+        const weights = this.getRarityWeights(fortuneRank);
+        const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+        let r = Math.random() * totalWeight;
         let rarity = 'common';
-        for (const [rar, w] of Object.entries(RARITY_WEIGHTS)) {
+        for (const [rar, w] of Object.entries(weights)) {
             r -= w;
             if (r <= 0) { rarity = rar; break; }
         }
@@ -323,7 +346,7 @@ const ClassSystem = {
     },
 
     /** Alias used by Game._doRoll() */
-    roll() { return this.rollRandom(); },
+    roll(fortuneRank = 0) { return this.rollRandom(fortuneRank); },
 
     /** Get rarity color */
     rarityColor(rarity) { return RARITY_COLORS[rarity] || '#ffffff'; },
@@ -339,13 +362,29 @@ const ClassSystem = {
             console.error('[ClassSystem] ABILITY_REGISTRY not loaded');
             return [];
         }
+        const abilityMetaById = new Map(
+            Array.isArray(classDef.abilities)
+                ? classDef.abilities.map(a => [a.id, a])
+                : []
+        );
         return classDef.abilityIds.map((id, idx) => {
             const Ctor = ABILITY_REGISTRY[id];
             if (!Ctor) {
                 console.warn('[ClassSystem] Unknown ability id:', id);
                 return null;
             }
-            return new Ctor(player, idx);
+            const ability = new Ctor(player, idx);
+            const meta = abilityMetaById.get(id);
+            ability.abilityId = id;
+            if (!ability.damageType) ability.damageType = 'ability';
+            const inferredTags = (meta && Array.isArray(meta.tags) && meta.tags.length > 0)
+                ? meta.tags
+                : ['ability', 'skill'];
+            ability.scalingTags = Array.isArray(ability.scalingTags)
+                ? Array.from(new Set([...ability.scalingTags, ...inferredTags, 'ability', 'skill']))
+                : Array.from(new Set([...inferredTags, 'ability', 'skill']));
+            if (!Number.isFinite(ability.baseDamage)) ability.baseDamage = player.baseAtk;
+            return ability;
         }).filter(Boolean);
     }
 };

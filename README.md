@@ -19,7 +19,7 @@ Open `index.html` in any modern browser. No build step, no dependencies.
 | **15+ Enemy Types + Multi-Boss** | Base dungeon enemies + Corrupted Depths enemy roster (Corrupted Slime, Void Bat, Cultist, Crystal Golem, Corrupted Archer, Void Hound, Crystal Turret, Corrupted Summoner) |
 | **2 Dungeons** | Dungeon 1: 10 rooms, Necromancer final boss · Dungeon 2: 20 rooms, Crystal Behemoth mini boss (room 10), Void Herald final boss (room 20) |
 | **Level-up System** | Choose 1 of 3 random run upgrades on level-up |
-| **Permanent Shop** | Spend crystals between runs for lasting upgrades |
+| **Permanent Shop** | Categorized Defense/Offense/Utility upgrade trees with scaling crystal costs |
 | **Status Effects** | Burn, Freeze, Poison, Shock, Bleed, Slow |
 | **Mobile Support** | On-screen joystick + touch buttons |
 | **Persistent Save** | Crystals, best run, permanent upgrades, unlocked classes in localStorage |
@@ -110,11 +110,26 @@ Only **Human Adventurer** is unlocked at the start. All others must be obtained 
 - Duplicate classes convert to **bonus crystals** (scaled by rarity: Common=2, Rare=4, Epic=8, Legendary=12, Mythic=20)
 - All unlocked classes visible in the **Collection** screen
 
+## Permanent Upgrade Categories
+
+- **Defense:** Fortified Body, Iron Skin, Fleet Footed, Evasion Training  
+  Focused on survivability, mitigation, mobility, and dodge.
+- **Offense:** Combat Training, Arcane Mastery, Rapid Strikes  
+  Focused on basic attack damage, ability damage scaling, and attack speed.
+- **Utility:** Fortune, Crystal Hoarder  
+  Focused on class-roll rarity progression and guaranteed crystal income.
+
 ## Crystal Rewards
 
 - Dungeon 1 room clear: **+1 crystal**.
 - Dungeon 2 room clear: **+2 crystals**.
-- **Crystal Finder** grants **+10% chance per level** to gain **+1 bonus crystal** on room clear (capped at 100%).
+- **Crystal Hoarder** grants **+1 guaranteed crystal per room per rank**.
+  - Dungeon 1 room clear = `1 + Crystal Hoarder rank`
+  - Dungeon 2 room clear = `2 + Crystal Hoarder rank`
+- **Fortune** slightly shifts class-roll rarity weights each rank:
+  - lowers Common chance a bit
+  - slightly increases Rare/Epic/Legendary/Mythic chances
+  - Mythic increases stay small (not a massive jump)
 - Dungeon 2 mini/final boss runs and higher-tier encounters produce higher total crystal income through stronger reward multipliers and guaranteed boss crystal payouts.
 - Room-clear crystals are saved to localStorage immediately.
 
@@ -140,7 +155,7 @@ js/
   saveSystem.js              <- localStorage persistence (includes class unlock state)
   assets.js                  <- Image preloader with canvas fallbacks (expanded generated asset set)
   statusEffects.js           <- Burn / Freeze / Poison / Shock / Bleed / Slow
-  upgrades.js                <- 20 run upgrades + 5 permanent upgrades
+  upgrades.js                <- Run upgrades + categorized permanent upgrade trees
   projectiles.js             <- Projectile + Particle + spawnExplosion
   abilities.js               <- 43 ability classes + ABILITY_REGISTRY
   classes.js                 <- CLASS_DEFS (12 classes), ClassSystem API, RARITY_COLORS

@@ -66,6 +66,12 @@ const Assets = {
         'upgrade_damage','upgrade_speed','upgrade_fireball','upgrade_attackspeed',
         'upgrade_maxhp','upgrade_range','upgrade_nova','upgrade_dash',
         'upgrade_lifesteal','upgrade_multishot','upgrade_thorns','upgrade_critical',
+        // Permanent upgrade tree icons
+        'upgrade_fortified_body','upgrade_iron_skin','upgrade_fleet_footed','upgrade_evasion_training',
+        'upgrade_combat_training','upgrade_arcane_mastery','upgrade_rapid_strikes',
+        'upgrade_fortune','upgrade_crystal_hoarder',
+        // Category icons
+        'category_defense','category_offense','category_utility',
         'xp_gem','particle_spark','heal_effect','ui_frame'
     ],
 
@@ -125,7 +131,13 @@ const Assets = {
         icon_room_crystal_cavern:'#a986ff', icon_room_corrupted_maze:'#7442a9',
         icon_room_elite_hunt:'#cf5f6f', icon_room_treasure_vault:'#d2a649',
         icon_room_corruption_flood:'#9037d2', icon_room_void_shrine:'#5f79c7',
-        ui_boss_bar_corrupted:'#b45bff'
+        ui_boss_bar_corrupted:'#b45bff',
+        // Permanent upgrade tree icons
+        upgrade_fortified_body:'#cc6677', upgrade_iron_skin:'#8899bb', upgrade_fleet_footed:'#66bbdd', upgrade_evasion_training:'#77ddbb',
+        upgrade_combat_training:'#dd6655', upgrade_arcane_mastery:'#aa66ff', upgrade_rapid_strikes:'#ffcc66',
+        upgrade_fortune:'#99dd66', upgrade_crystal_hoarder:'#bb88ff',
+        // Category icons
+        category_defense:'#88aaff', category_offense:'#ff9977', category_utility:'#aadd88'
     },
 
     load(callback) {
