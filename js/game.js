@@ -115,6 +115,7 @@ const Game = {
     cardsMenuPage: 0,
     cardsMenuRarityFilter: 'all',
     cardsMenuTypeFilter: 'all',
+    cardsMenuScrollY: 0,
     hoverCardShopItem: -1,
 
     // Mobile joystick
@@ -211,6 +212,14 @@ const Game = {
             const my = (e.clientY - rect.top) * scaleY;
             this._onClick(mx, my);
         });
+
+        this.canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            if (this.state === STATES.CARDS) {
+                this.cardsMenuScrollY += e.deltaY * 0.6;
+                this._clampCardsScroll();
+            }
+        }, { passive: false });
     },
 
     _setupMobileControls() {
@@ -342,13 +351,22 @@ const Game = {
         } else if (this.state === STATES.CARDS) {
             this.hoverCardMenuItem = -1;
             const cards = this.getVisibleCardsForMenu();
-            cards.forEach((_, i) => {
-                const col = i % 4;
-                const row = Math.floor(i / 4);
-                const x = 70 + col * 170;
-                const y = 180 + row * 170;
-                if (mx >= x && mx <= x + 150 && my >= y && my <= y + 150) this.hoverCardMenuItem = i;
-            });
+            const GRID_X = 8, GRID_Y = 118, GRID_W = 570, GRID_H = 435;
+            const CARD_W = 160, CARD_H = 148, GAP_X = 15, GAP_Y = 12;
+            const PER_ROW = 3;
+            const startX = GRID_X + Math.floor((GRID_W - PER_ROW * CARD_W - (PER_ROW - 1) * GAP_X) / 2);
+            const scrollY = this.cardsMenuScrollY || 0;
+            // Only register hover when mouse is inside the grid viewport
+            if (mx >= GRID_X && mx <= GRID_X + GRID_W && my >= GRID_Y && my <= GRID_Y + GRID_H) {
+                cards.forEach((_, i) => {
+                    const col = i % PER_ROW;
+                    const row = Math.floor(i / PER_ROW);
+                    const cx = startX + col * (CARD_W + GAP_X);
+                    const cy = GRID_Y + 6 + row * (CARD_H + GAP_Y) - scrollY;
+                    if (cy + CARD_H < GRID_Y || cy > GRID_Y + GRID_H) return;
+                    if (mx >= cx && mx <= cx + CARD_W && my >= cy && my <= cy + CARD_H) this.hoverCardMenuItem = i;
+                });
+            }
         } else if (this.state === STATES.CARD_SHOP) {
             this.hoverCardShopItem = -1;
             const inventory = this.getCardShopInventory().cards;
@@ -370,7 +388,7 @@ const Game = {
                 if (mx >= 260 && mx <= 540 && my >= b.y && my <= b.y + 44) {
                     if (b.id === 'play')  this.state = STATES.DUNGEON_SELECT;
                     if (b.id === 'class_select') this.state = STATES.CLASS_SELECT;
-                    if (b.id === 'cards') this.state = STATES.CARDS;
+                    if (b.id === 'cards') { this.state = STATES.CARDS; this.cardsMenuScrollY = 0; }
                     if (b.id === 'card_shop') this.state = STATES.CARD_SHOP;
                     if (b.id === 'permanent_shop') this.state = STATES.PERMANENT_SHOP;
                     if (b.id === 'settings') this.state = STATES.SETTINGS;
@@ -472,25 +490,48 @@ const Game = {
             if (my >= 560) { this.state = STATES.MENU; return; }
             this.buyCardFromShop(this.hoverCardShopItem);
         } else if (this.state === STATES.CARDS) {
-            if (my >= 560) { this.state = STATES.MENU; return; }
-            if (mx >= 40 && mx <= 170 && my >= 95 && my <= 125) { this.cycleCardsRarityFilter(); return; }
-            if (mx >= 190 && mx <= 360 && my >= 95 && my <= 125) { this.cycleCardsTypeFilter(); return; }
-            if (mx >= 590 && mx <= 760 && my >= 95 && my <= 125) { this.saveCurrentCardsToPreset(); return; }
-            if (mx >= 590 && mx <= 760 && my >= 130 && my <= 160) { this.loadSelectedCardPreset(); return; }
-            if (mx >= 590 && mx <= 760 && my >= 165 && my <= 195) { this.renameSelectedCardPreset(); return; }
-            if (mx >= 590 && mx <= 760 && my >= 200 && my <= 230) { this.createCardPreset(); return; }
-            if (mx >= 590 && mx <= 760 && my >= 235 && my <= 265) { this.deleteSelectedCardPreset(); return; }
-            if (mx >= 590 && mx <= 760 && my >= 270 && my <= 300) { this.selectNextCardPreset(); return; }
-            const cards = this.getVisibleCardsForMenu();
-            cards.forEach((card, i) => {
-                const col = i % 4;
-                const row = Math.floor(i / 4);
-                const x = 70 + col * 170;
-                const y = 180 + row * 170;
-                if (mx >= x && mx <= x + 150 && my >= y && my <= y + 150) {
-                    this.toggleCardEquip(card.id);
+            // Back to Menu
+            if (my >= 575 && mx >= 8 && mx <= 200) { this.state = STATES.MENU; return; }
+            // Filter buttons
+            if (mx >= 16 && mx <= 151 && my >= 68 && my <= 94) { this.cycleCardsRarityFilter(); return; }
+            if (mx >= 158 && mx <= 313 && my >= 68 && my <= 94) { this.cycleCardsTypeFilter(); return; }
+            // Preset buttons (sidebar x=582..800, buttons x=590..792, y stride=37 from y=76)
+            const SIDEBAR_X = 582;
+            const BTN_X1 = SIDEBAR_X + 8, BTN_X2 = 800 - 8;
+            const BTN_H = 30, BTN_STRIDE = 37, BTN_Y0 = 76;
+            const presetActions = [
+                () => this.saveCurrentCardsToPreset(),
+                () => this.loadSelectedCardPreset(),
+                () => this.renameSelectedCardPreset(),
+                () => this.createCardPreset(),
+                () => this.deleteSelectedCardPreset(),
+                () => this.selectNextCardPreset(),
+            ];
+            if (mx >= BTN_X1 && mx <= BTN_X2) {
+                for (let i = 0; i < presetActions.length; i++) {
+                    const by = BTN_Y0 + i * BTN_STRIDE;
+                    if (my >= by && my <= by + BTN_H) { presetActions[i](); return; }
                 }
-            });
+            }
+            // Card grid clicks (with scroll offset)
+            const GRID_X = 8, GRID_Y = 118, GRID_W = 570, GRID_H = 435;
+            const CARD_W = 160, CARD_H = 148, GAP_X = 15, GAP_Y = 12;
+            const PER_ROW = 3;
+            const startX = GRID_X + Math.floor((GRID_W - PER_ROW * CARD_W - (PER_ROW - 1) * GAP_X) / 2);
+            const scrollY = this.cardsMenuScrollY || 0;
+            if (mx >= GRID_X && mx <= GRID_X + GRID_W && my >= GRID_Y && my <= GRID_Y + GRID_H) {
+                const cards = this.getVisibleCardsForMenu();
+                cards.forEach((card, i) => {
+                    const col = i % PER_ROW;
+                    const row = Math.floor(i / PER_ROW);
+                    const cx = startX + col * (CARD_W + GAP_X);
+                    const cy = GRID_Y + 6 + row * (CARD_H + GAP_Y) - scrollY;
+                    if (cy + CARD_H < GRID_Y || cy > GRID_Y + GRID_H) return;
+                    if (mx >= cx && mx <= cx + CARD_W && my >= cy && my <= cy + CARD_H) {
+                        this.toggleCardEquip(card.id);
+                    }
+                });
+            }
         } else if (this.state === STATES.PAUSED) {
             if (my >= 410 && my <= 450 && mx >= 290 && mx <= 510) { this.state = STATES.PLAYING; }
             if (my >= 465 && my <= 505 && mx >= 290 && mx <= 510) { this.state = STATES.MENU; }
@@ -907,12 +948,14 @@ const Game = {
         const values = ['all', 'common', 'rare', 'epic', 'legendary', 'mythic'];
         const idx = values.indexOf(this.cardsMenuRarityFilter || 'all');
         this.cardsMenuRarityFilter = values[(idx + 1) % values.length];
+        this.cardsMenuScrollY = 0;
     },
 
     cycleCardsTypeFilter() {
         const values = ['all', 'generic', 'ability', 'synergy'];
         const idx = values.indexOf(this.cardsMenuTypeFilter || 'all');
         this.cardsMenuTypeFilter = values[(idx + 1) % values.length];
+        this.cardsMenuScrollY = 0;
     },
 
     _selectedPreset() {
@@ -973,6 +1016,15 @@ const Game = {
         const next = this.saveData.cardPresets[(idx + 1 + this.saveData.cardPresets.length) % this.saveData.cardPresets.length];
         this.saveData.selectedCardPresetId = next.id;
         SaveSystem.save(this.saveData);
+    },
+
+    _clampCardsScroll() {
+        const cards = this.getVisibleCardsForMenu();
+        const rows = Math.ceil(cards.length / 3);
+        const totalContentH = rows * (148 + 12) + 6; // CARD_H=148, GAP_Y=12
+        const viewH = 435; // GRID_H
+        const maxScroll = Math.max(0, totalContentH - viewH);
+        this.cardsMenuScrollY = Math.max(0, Math.min(maxScroll, this.cardsMenuScrollY || 0));
     },
 
     _finalizeRunCrystalAccounting(outcome) {
@@ -1311,7 +1363,7 @@ const Game = {
                 UI.renderHelp(ctx);
                 break;
             case STATES.CARDS:
-                UI.renderCardsMenu(ctx, this.saveData, this.getVisibleCardsForMenu(), this.hoverCardMenuItem, this.cardsMenuRarityFilter, this.cardsMenuTypeFilter);
+                UI.renderCardsMenu(ctx, this.saveData, this.getVisibleCardsForMenu(), this.hoverCardMenuItem, this.cardsMenuRarityFilter, this.cardsMenuTypeFilter, this.cardsMenuScrollY);
                 break;
             case STATES.CARD_SHOP:
                 UI.renderCardShop(ctx, this.saveData, this.getCardShopInventory(), this.hoverCardShopItem);

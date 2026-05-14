@@ -937,77 +937,293 @@ const UI = {
         ctx.fillText('← Back to Menu', 30, 580);
     },
 
-    renderCardsMenu(ctx, saveData, cards, hoverIdx, rarityFilter, typeFilter) {
-        ctx.fillStyle = '#0b0a14';
-        ctx.fillRect(0, 0, 800, 600);
-        ctx.fillStyle = '#d8c5ff';
-        ctx.font = 'bold 30px monospace';
-        ctx.fillText('CARDS', 30, 48);
+    renderCardsMenu(ctx, saveData, cards, hoverIdx, rarityFilter, typeFilter, scrollY) {
+        // ── Layout constants ────────────────────────────────────────────────
+        const CW = 800, CH = 600;
+        const SIDEBAR_X = 582;            // right sidebar starts here
+        const SIDE_CX   = SIDEBAR_X + 109; // sidebar horizontal centre
 
-        Assets.draw(ctx, 'icon_coins', 640, 20, 18, 18);
-        ctx.fillStyle = '#ffcc55';
-        ctx.font = 'bold 16px monospace';
-        ctx.fillText(`${(saveData && saveData.coins) || 0}`, 664, 35);
+        // Card-grid viewport (clipped region inside the left column)
+        const GRID_X = 8, GRID_Y = 118;
+        const GRID_W = SIDEBAR_X - GRID_X - 4; // 570
+        const GRID_H = 435;                     // 118..553
+
+        // Card geometry (3 per row)
+        const CARD_W = 160, CARD_H = 148;
+        const GAP_X  = 15,  GAP_Y  = 12;
+        const PER_ROW = 3;
+        const gridStartX = GRID_X + Math.floor((GRID_W - PER_ROW * CARD_W - (PER_ROW - 1) * GAP_X) / 2); // 38
+
+        // Preset-button geometry
+        const BTN_X    = SIDEBAR_X + 8;
+        const BTN_W    = CW - SIDEBAR_X - 16; // 202
+        const BTN_H    = 30;
+        const BTN_GAP  = 7;
+        const BTN_STRIDE = BTN_H + BTN_GAP; // 37
+        const BTN_Y0   = 76;
+
+        scrollY = scrollY || 0;
 
         const equipped = new Set((saveData && saveData.equippedCardIds) || []);
-        const owned = new Set((saveData && saveData.ownedCardIds) || []);
+        const owned    = new Set((saveData && saveData.ownedCardIds)    || []);
+        const totalCards = (typeof UpgradeSystem !== 'undefined' && UpgradeSystem.allCards().length) || 0;
+
+        // Helper: wrap text within maxW, return final y
+        const wrapText = (text, cx, y, maxW, lineH) => {
+            const words = text.split(' ');
+            let line = '';
+            for (const word of words) {
+                const test = line ? line + ' ' + word : word;
+                if (ctx.measureText(test).width <= maxW) { line = test; }
+                else { if (line) { ctx.fillText(line, cx, y); y += lineH; } line = word; }
+            }
+            if (line) ctx.fillText(line, cx, y);
+            return y + lineH;
+        };
+
+        // ── Backgrounds ─────────────────────────────────────────────────────
+        ctx.fillStyle = '#0b0a14';
+        ctx.fillRect(0, 0, CW, CH);
+
+        ctx.fillStyle = '#0e0c1b';
+        ctx.fillRect(SIDEBAR_X, 0, CW - SIDEBAR_X, CH);
+
+        // Vertical separator
+        ctx.strokeStyle = '#2a2540';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(SIDEBAR_X, 0);
+        ctx.lineTo(SIDEBAR_X, CH);
+        ctx.stroke();
+
+        // ── Left header ─────────────────────────────────────────────────────
+        ctx.fillStyle = '#d8c5ff';
+        ctx.font = 'bold 26px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('CARDS', 16, 38);
+
         ctx.fillStyle = '#9e8fb8';
-        ctx.font = '13px monospace';
-        ctx.fillText(`Equipped: ${equipped.size}  Owned: ${owned.size}/${(typeof UpgradeSystem !== 'undefined' && UpgradeSystem.allCards().length) || 0}`, 30, 75);
+        ctx.font = '11px monospace';
+        ctx.fillText(`Equipped: ${equipped.size}   Owned: ${owned.size}/${totalCards}`, 16, 56);
 
+        // Rarity filter button
+        const rBtnX = 16, rBtnY = 68, rBtnW = 135, rBtnH = 26;
         ctx.fillStyle = '#1b2233';
-        ctx.fillRect(40, 95, 130, 30);
-        ctx.fillRect(190, 95, 170, 30);
+        ctx.strokeStyle = '#3a4060';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(rBtnX, rBtnY, rBtnW, rBtnH, 4); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#c8d4ff';
-        ctx.fillText(`Rarity: ${(rarityFilter || 'all').toUpperCase()}`, 48, 115);
-        ctx.fillText(`Type: ${(typeFilter || 'all').toUpperCase()}`, 198, 115);
+        ctx.font = '11px monospace';
+        ctx.fillText(`Rarity: ${(rarityFilter || 'all').toUpperCase()}`, rBtnX + 6, rBtnY + 17);
 
+        // Type filter button
+        const tBtnX = 158, tBtnY = 68, tBtnW = 155, tBtnH = 26;
+        ctx.fillStyle = '#1b2233';
+        ctx.strokeStyle = '#3a4060';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(tBtnX, tBtnY, tBtnW, tBtnH, 4); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#c8d4ff';
+        ctx.fillText(`Type: ${(typeFilter || 'all').toUpperCase()}`, tBtnX + 6, tBtnY + 17);
+
+        // Thin rule above grid
+        ctx.strokeStyle = '#1e1c30';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(GRID_X, GRID_Y - 2); ctx.lineTo(GRID_X + GRID_W, GRID_Y - 2);
+        ctx.stroke();
+
+        // ── Scrollable card grid ─────────────────────────────────────────────
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(GRID_X, GRID_Y, GRID_W, GRID_H);
+        ctx.clip();
+
+        cards.forEach((card, i) => {
+            const col = i % PER_ROW;
+            const row = Math.floor(i / PER_ROW);
+            const cx  = gridStartX + col * (CARD_W + GAP_X);
+            const cy  = GRID_Y + 6 + row * (CARD_H + GAP_Y) - scrollY;
+
+            if (cy + CARD_H < GRID_Y || cy > GRID_Y + GRID_H) return; // cull
+
+            const rarityColor = (typeof ClassSystem !== 'undefined' && ClassSystem.rarityColor)
+                ? ClassSystem.rarityColor(card.rarity) : '#888';
+            const isOwned    = owned.has(card.id);
+            const isEquipped = equipped.has(card.id);
+
+            // Card background
+            ctx.fillStyle   = hoverIdx === i ? '#2a233a' : '#171326';
+            ctx.strokeStyle = rarityColor;
+            ctx.lineWidth   = isEquipped ? 3 : 1.5;
+            ctx.beginPath(); ctx.roundRect(cx, cy, CARD_W, CARD_H, 8); ctx.fill(); ctx.stroke();
+
+            // Dim overlay for locked cards
+            if (!isOwned) {
+                ctx.fillStyle = 'rgba(0,0,0,0.50)';
+                ctx.beginPath(); ctx.roundRect(cx, cy, CARD_W, CARD_H, 8); ctx.fill();
+            }
+
+            // Icon (centred, top area)
+            Assets.draw(ctx, card.icon || 'card_back', cx + CARD_W / 2 - 20, cy + 8, 40, 40);
+
+            // Badges
+            if (!isOwned)    Assets.draw(ctx, 'icon_lock',     cx + CARD_W - 26, cy + 4, 20, 20);
+            if (isEquipped)  Assets.draw(ctx, 'icon_equipped', cx + 4,           cy + 4, 20, 20);
+
+            // Card name
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(card.name, cx + CARD_W / 2, cy + 57);
+
+            // Rarity
+            ctx.fillStyle = rarityColor;
+            ctx.font = '9px monospace';
+            ctx.fillText((card.rarity || '').toUpperCase(), cx + CARD_W / 2, cy + 68);
+
+            // Description – 2 lines max, word-wrapped
+            const desc = card.description || card.desc || '';
+            ctx.fillStyle = '#8a85a8';
+            ctx.font = '9px monospace';
+            const maxDescW = CARD_W - 12;
+            let line1 = '', line2 = '';
+            for (const word of desc.split(' ')) {
+                const t1 = line1 ? line1 + ' ' + word : word;
+                if (ctx.measureText(t1).width <= maxDescW) { line1 = t1; continue; }
+                if (!line2) { line2 = word; continue; }
+                const t2 = line2 + ' ' + word;
+                if (ctx.measureText(t2).width <= maxDescW) line2 = t2;
+                else break; // clamp at 2 lines
+            }
+            ctx.fillText(line1.trim(), cx + CARD_W / 2, cy + 82);
+            if (line2.trim()) ctx.fillText(line2.trim(), cx + CARD_W / 2, cy + 93);
+
+            // Status badge at bottom
+            ctx.fillStyle = isOwned ? (isEquipped ? '#88ff88' : '#9ba9d0') : '#665577';
+            ctx.font = '9px monospace';
+            ctx.fillText(
+                !isOwned ? 'LOCKED' : (isEquipped ? 'EQUIPPED' : 'CLICK TO EQUIP'),
+                cx + CARD_W / 2, cy + CARD_H - 8
+            );
+
+            ctx.textAlign = 'left';
+        });
+
+        ctx.restore(); // end clip
+
+        // Scroll-bar indicator
+        const totalRows    = Math.ceil(cards.length / PER_ROW);
+        const totalContentH = totalRows * (CARD_H + GAP_Y) + 6;
+        if (totalContentH > GRID_H) {
+            const sbX     = GRID_X + GRID_W - 5;
+            const thumbH  = Math.max(20, GRID_H * GRID_H / totalContentH);
+            const thumbY  = GRID_Y + (scrollY / Math.max(1, totalContentH - GRID_H)) * (GRID_H - thumbH);
+            ctx.fillStyle = '#22203a';
+            ctx.fillRect(sbX, GRID_Y, 5, GRID_H);
+            ctx.fillStyle = '#6655aa';
+            ctx.beginPath(); ctx.roundRect(sbX, thumbY, 5, thumbH, 2); ctx.fill();
+        }
+
+        // Back button (always visible, below grid)
+        ctx.fillStyle = '#887799';
+        ctx.font = '13px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('← Back to Menu', 16, CH - 10);
+
+        // ── Right Sidebar ────────────────────────────────────────────────────
         const preset = (saveData && Array.isArray(saveData.cardPresets))
             ? saveData.cardPresets.find(p => p.id === saveData.selectedCardPresetId)
             : null;
+
+        // Coin display
+        Assets.draw(ctx, 'icon_coins', SIDEBAR_X + 8, 14, 16, 16);
+        ctx.fillStyle = '#ffcc55';
+        ctx.font = 'bold 13px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${(saveData && saveData.coins) || 0}`, SIDEBAR_X + 28, 27);
+
+        // PRESETS label
+        ctx.fillStyle = '#c8b8f0';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('PRESETS', SIDE_CX, 48);
+
+        // Current preset name
+        const presetName = (preset && preset.name) || 'None';
         ctx.fillStyle = '#9e8fb8';
-        ctx.fillText(`Preset: ${(preset && preset.name) || 'None'}`, 590, 80);
-        const presetBtns = ['Save', 'Load', 'Rename', 'Create', 'Delete', 'Next'];
+        ctx.font = '10px monospace';
+        ctx.fillText(presetName.length > 20 ? presetName.slice(0, 19) + '…' : presetName, SIDE_CX, 63);
+
+        // Preset buttons (vertical, evenly spaced, no overlap)
+        const presetBtns = ['Save Preset', 'Load Preset', 'Rename', 'New Preset', 'Delete', 'Next →'];
         presetBtns.forEach((label, i) => {
+            const by = BTN_Y0 + i * BTN_STRIDE;
             ctx.fillStyle = '#2f2a43';
-            ctx.fillRect(590, 95 + i * 35, 170, 30);
+            ctx.strokeStyle = '#4a4060';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.roundRect(BTN_X, by, BTN_W, BTN_H, 5); ctx.fill(); ctx.stroke();
             ctx.fillStyle = '#d7d0ec';
-            ctx.fillText(label, 650, 115 + i * 35);
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, SIDE_CX, by + 19);
         });
 
-        cards.forEach((card, i) => {
-            const col = i % 4;
-            const row = Math.floor(i / 4);
-            const x = 70 + col * 170;
-            const y = 180 + row * 170;
-            const rarityColor = (typeof ClassSystem !== 'undefined' && ClassSystem.rarityColor) ? ClassSystem.rarityColor(card.rarity) : '#888';
-            const isOwned = owned.has(card.id);
-            const isEquipped = equipped.has(card.id);
-            ctx.fillStyle = hoverIdx === i ? '#2a233a' : '#171326';
-            ctx.strokeStyle = rarityColor;
-            ctx.lineWidth = isEquipped ? 3 : 2;
-            ctx.beginPath();
-            ctx.roundRect(x, y, 150, 150, 8);
-            ctx.fill();
-            ctx.stroke();
-            if (!isOwned) ctx.fillStyle = 'rgba(0,0,0,0.55)', ctx.fillRect(x, y, 150, 150);
-            Assets.draw(ctx, card.icon || 'card_back', x + 54, y + 12, 42, 42);
-            if (!isOwned) Assets.draw(ctx, 'icon_lock', x + 116, y + 8, 24, 24);
-            if (isEquipped) Assets.draw(ctx, 'icon_equipped', x + 8, y + 8, 24, 24);
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 12px monospace';
+        // Separator before detail panel
+        const detailY = BTN_Y0 + 6 * BTN_STRIDE + 8; // 76 + 222 + 8 = 306
+        ctx.strokeStyle = '#2a2545';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(SIDEBAR_X + 8, detailY - 4); ctx.lineTo(CW - 8, detailY - 4);
+        ctx.stroke();
+
+        // ── Hovered-card detail panel ────────────────────────────────────────
+        const selCard = (hoverIdx >= 0 && hoverIdx < cards.length) ? cards[hoverIdx] : null;
+        if (selCard) {
+            const isOwned    = owned.has(selCard.id);
+            const isEquipped = equipped.has(selCard.id);
+            const rarityColor = (typeof ClassSystem !== 'undefined' && ClassSystem.rarityColor)
+                ? ClassSystem.rarityColor(selCard.rarity) : '#888';
+
+            ctx.fillStyle = '#c8b8f0';
+            ctx.font = 'bold 10px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(card.name, x + 75, y + 70);
-            ctx.fillStyle = '#a9a4c7';
+            ctx.fillText('CARD DETAILS', SIDE_CX, detailY + 12);
+
+            Assets.draw(ctx, selCard.icon || 'card_back', SIDE_CX - 18, detailY + 18, 36, 36);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px monospace';
+            ctx.fillText(selCard.name, SIDE_CX, detailY + 64);
+
+            ctx.fillStyle = rarityColor;
+            ctx.font = '9px monospace';
+            ctx.fillText((selCard.rarity || '').toUpperCase(), SIDE_CX, detailY + 76);
+
+            if (selCard.type) {
+                ctx.fillStyle = '#9e8fb8';
+                ctx.fillText((selCard.type || '').toUpperCase(), SIDE_CX, detailY + 87);
+            }
+
+            // Wrapped description
+            const fullDesc = selCard.description || selCard.desc || '';
+            ctx.fillStyle = '#8a85a8';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            wrapText(fullDesc, SIDE_CX, detailY + 100, BTN_W, 11);
+
+            // Status
+            ctx.fillStyle = isOwned ? (isEquipped ? '#88ff88' : '#aabbdd') : '#665577';
+            ctx.font = 'bold 9px monospace';
+            ctx.fillText(!isOwned ? 'LOCKED' : (isEquipped ? '✓ EQUIPPED' : 'Owned'), SIDE_CX, detailY + 170);
+        } else {
+            ctx.fillStyle = '#443355';
             ctx.font = '10px monospace';
-            ctx.fillText((card.description || card.desc || '').slice(0, 32), x + 75, y + 86);
-            ctx.fillStyle = isOwned ? (isEquipped ? '#88ff88' : '#9ba9d0') : '#aa8899';
-            ctx.fillText(!isOwned ? 'LOCKED' : (isEquipped ? 'EQUIPPED' : 'CLICK TO EQUIP'), x + 75, y + 138);
-            ctx.textAlign = 'left';
-        });
-        ctx.fillStyle = '#887799';
-        ctx.font = '13px monospace';
-        ctx.fillText('← Back to Menu', 30, 580);
+            ctx.textAlign = 'center';
+            ctx.fillText('Hover a card', SIDE_CX, detailY + 22);
+            ctx.fillText('to see details', SIDE_CX, detailY + 35);
+        }
+
+        ctx.textAlign = 'left';
     },
 
     renderCardShop(ctx, saveData, shopData, hoverIdx) {
