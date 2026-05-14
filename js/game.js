@@ -1019,11 +1019,12 @@ const Game = {
     },
 
     _clampCardsScroll() {
+        // Must match ui.js renderCardsMenu constants: CARD_H=148, GAP_Y=12, PER_ROW=3, GRID_H=435
+        const CARD_H = 148, GAP_Y = 12, PER_ROW = 3, GRID_H = 435;
         const cards = this.getVisibleCardsForMenu();
-        const rows = Math.ceil(cards.length / 3);
-        const totalContentH = rows * (148 + 12) + 6; // CARD_H=148, GAP_Y=12
-        const viewH = 435; // GRID_H
-        const maxScroll = Math.max(0, totalContentH - viewH);
+        const rows = Math.ceil(cards.length / PER_ROW);
+        const totalContentH = rows * (CARD_H + GAP_Y) + 6;
+        const maxScroll = Math.max(0, totalContentH - GRID_H);
         this.cardsMenuScrollY = Math.max(0, Math.min(maxScroll, this.cardsMenuScrollY || 0));
     },
 

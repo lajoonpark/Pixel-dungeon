@@ -968,16 +968,22 @@ const UI = {
         const owned    = new Set((saveData && saveData.ownedCardIds)    || []);
         const totalCards = (typeof UpgradeSystem !== 'undefined' && UpgradeSystem.allCards().length) || 0;
 
-        // Helper: wrap text within maxW, return final y
-        const wrapText = (text, cx, y, maxW, lineH) => {
+        // Helper: wrap text within maxW, return final y. Optional maxLines caps output.
+        const wrapText = (text, cx, y, maxW, lineH, maxLines) => {
             const words = text.split(' ');
             let line = '';
+            let lineCount = 0;
             for (const word of words) {
+                if (maxLines && lineCount >= maxLines) break;
                 const test = line ? line + ' ' + word : word;
                 if (ctx.measureText(test).width <= maxW) { line = test; }
-                else { if (line) { ctx.fillText(line, cx, y); y += lineH; } line = word; }
+                else {
+                    if (line) { ctx.fillText(line, cx, y); y += lineH; lineCount++; }
+                    if (maxLines && lineCount >= maxLines) { line = ''; break; }
+                    line = word;
+                }
             }
-            if (line) ctx.fillText(line, cx, y);
+            if (line && (!maxLines || lineCount < maxLines)) ctx.fillText(line, cx, y);
             return y + lineH;
         };
 
@@ -1085,18 +1091,7 @@ const UI = {
             const desc = card.description || card.desc || '';
             ctx.fillStyle = '#8a85a8';
             ctx.font = '9px monospace';
-            const maxDescW = CARD_W - 12;
-            let line1 = '', line2 = '';
-            for (const word of desc.split(' ')) {
-                const t1 = line1 ? line1 + ' ' + word : word;
-                if (ctx.measureText(t1).width <= maxDescW) { line1 = t1; continue; }
-                if (!line2) { line2 = word; continue; }
-                const t2 = line2 + ' ' + word;
-                if (ctx.measureText(t2).width <= maxDescW) line2 = t2;
-                else break; // clamp at 2 lines
-            }
-            ctx.fillText(line1.trim(), cx + CARD_W / 2, cy + 82);
-            if (line2.trim()) ctx.fillText(line2.trim(), cx + CARD_W / 2, cy + 93);
+            wrapText(desc, cx + CARD_W / 2, cy + 82, CARD_W - 12, 11, 2);
 
             // Status badge at bottom
             ctx.fillStyle = isOwned ? (isEquipped ? '#88ff88' : '#9ba9d0') : '#665577';
